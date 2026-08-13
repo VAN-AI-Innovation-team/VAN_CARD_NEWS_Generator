@@ -1,0 +1,40 @@
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Node (React) 관련
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Java (Spring) 관련
+backend/build/
+backend/.gradle/
+backend/out/
+backend/.idea/
+backend/.env
+
+# 공통 OS 파일
+.DS_Store
+Thumbs.db

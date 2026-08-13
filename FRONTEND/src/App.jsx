@@ -1,0 +1,30 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+
+function App() {
+  const [message, setMessage] = useState('연동 확인 중...');
+
+  useEffect(() => {
+    // 환경 변수 대신 주소를 직접 입력해서 테스트
+    axios
+      .get('http://localhost:8080/api/health')
+      .then((res) => {
+        setMessage(res.data.message);
+      })
+      .catch((err) => {
+        console.error('CORS 또는 네트워크 에러 발생:', err);
+        setMessage('통신 실패! F12 콘솔창을 확인하세요.');
+      });
+  }, []);
+
+  return (
+    <div style={{ padding: '40px', fontFamily: 'sans-serif' }}>
+      <h1>🤝 프론트-백엔드 연동 테스트</h1>
+      <p>
+        백엔드 응답 결과: <strong style={{ color: 'blue' }}>{message}</strong>
+      </p>
+    </div>
+  );
+}
+
+export default App;
