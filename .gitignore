@@ -10,7 +10,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -19,22 +19,22 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs
+# Java Virtual Machine crash logs
 hs_err_pid*
 replay_pid*
 
-# Node (React) 관련
+# Node / Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env
 
-# Java (Spring) 관련
+# Java / Spring Backend
 backend/build/
 backend/.gradle/
 backend/out/
 backend/.idea/
 backend/.env
 
-# 공통 OS 파일
+# Common OS files
 .DS_Store
 Thumbs.db
