@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-
+// 임시 테스트용 컴포넌트 import 추가
+import PostInputForm from './components/PostForm/PostInputForm';
 function App() {
   const [message, setMessage] = useState('연동 확인 중...');
 
