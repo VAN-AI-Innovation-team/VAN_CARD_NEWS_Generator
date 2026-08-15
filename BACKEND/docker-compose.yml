@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL
+  db:
+    # 운영 환경에서는 latest 대신 검증된 major version을 명시합니다.
+    # 실제 운영 배포 시에는 이미지 digest까지 고정하는 것을 권장합니다.
+    image: postgres:17-alpine
+
+    container_name: van-card-news-db
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: van_card_news_db
+      POSTGRES_USER: van_web
+
+      # 실제 비밀번호를 environment에 직접 작성하지 않습니다.
+      # Docker Secret 파일을 PostgreSQL이 읽도록 합니다.
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+
+    secrets:
+      - db_password
+
+    volumes:
+      # 컨테이너를 삭제/재생성해도 DB 데이터를 유지합니다.
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - backend_network
+
+    # PostgreSQL은 외부에 직접 공개하지 않습니다.
+    # 절대로 다음과 같이 작성하지 않습니다.
+    # ports:
+    #   - "5432:5432"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U van_web -d van_card_news_db"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    # 컨테이너가 추가 권한을 획득하는 것을 방지합니다.
+    security_opt:
+      - no-new-privileges:true
+
+    stop_grace_period: 30s
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: van-card-news-backend
+
+    restart: unless-stopped
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/van_card_news_db
+      SPRING_DATASOURCE_USERNAME: van_web
+      SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/db_password
+      LOG_LEVEL_ROOT: INFO
+      SERVER_ERROR_INCLUDE_MESSAGE: always
+      SERVER_ERROR_INCLUDE_STACKTRACE: on_param
+      SERVER_ERROR_INCLUDE_BINDING_ERRORS: always
+
+    secrets:
+      - source: db_password
+        target: db_password
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - backend_network
+
+    security_opt:
+      - no-new-privileges:true
+
+    stop_grace_period: 30s
+
+volumes:
+  postgres_data:
+
+networks:
+  backend_network:
+    driver: bridge
+
+secrets:
+
+  db_password:
+    file: ./secrets/db_password.txt

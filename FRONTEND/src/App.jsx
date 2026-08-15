@@ -5,9 +5,8 @@ function App() {
   const [message, setMessage] = useState('연동 확인 중...');
 
   useEffect(() => {
-    // 환경 변수 대신 주소를 직접 입력해서 테스트
     axios
-      .get('http://localhost:8080/api/health')
+      .get('/api/health')
       .then((res) => {
         setMessage(res.data.message);
       })
