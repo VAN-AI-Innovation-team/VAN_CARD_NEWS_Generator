@@ -28,9 +28,7 @@ export function TemplateSelector() {
               className={`tpl-card${isSelected ? ' tpl-card--selected' : ''}`}
               onClick={() => setSelectedTemplateId(tpl.id)}
             >
-              <span className="tpl-card__hole" aria-hidden="true" />
               <span className="tpl-card__corner" aria-hidden="true" />
-
               <span className="tpl-card__letter">{tpl.id}</span>
               <span className="tpl-card__tag">{tpl.tag}</span>
               <span className="tpl-card__label">{tpl.label}</span>

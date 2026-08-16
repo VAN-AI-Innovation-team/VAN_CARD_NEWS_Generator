@@ -19,6 +19,7 @@
   font-family: 'Source Serif Pro', 'Noto Serif KR', Georgia, serif;
   color: var(--tpl-ink);
   max-width: 880px;
+  margin: 0 auto;
 }
 
 .tpl-selector__header {
@@ -49,9 +50,26 @@
   gap: 18px;
 }
 
+/* 모바일 전용 스타일 */
 @media (max-width: 560px) {
   .tpl-selector__grid {
     grid-template-columns: 1fr;
+  }
+
+  /* 주요 내용 및 디자인 특징 영역 완벽 숨김 */
+  .tpl-card__row {
+    display: none !important;
+  }
+
+  /* 내부 하단 여백(40px -> 16px)을 줄여 카드 높이가 자동으로 콤팩트하게 줄어들도록 설정 */
+  .tpl-card {
+    padding: 16px 16px 16px 20px;
+  }
+
+  /* 줄어든 카드 높이에 맞춰 스탬프 위치 살짝 조정 */
+  .tpl-card__stamp {
+    bottom: 10px;
+    right: 10px;
   }
 }
 
