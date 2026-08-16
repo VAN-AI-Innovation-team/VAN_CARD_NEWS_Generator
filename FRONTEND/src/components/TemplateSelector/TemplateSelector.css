@@ -1,0 +1,164 @@
+/*
+ 디자인 컨셉: "학술 카탈로그 인덱스 카드" — Issue #5(입력 폼) 톤을 그대로 이어감
+ - 종이 색 배경 + 세리프 마스트헤드 타이포
+ - 우하단 코너 마운트(사진 모서리 고정 장식)
+ - 선택 시 도서관 대출 스탬프처럼 살짝 회전된 "SELECTED" 인장이 찍힘
+*/
+
+:root {
+  --tpl-paper: #efeadf;
+  --tpl-paper-raised: #f7f3e9;
+  --tpl-ink: #262220;
+  --tpl-ink-soft: #6b6259;
+  --tpl-rule: #7a2e2e;
+  --tpl-brass: #9c7c38;
+  --tpl-stamp: #7a2e2e;
+}
+
+.tpl-selector {
+  font-family: 'Source Serif Pro', 'Noto Serif KR', Georgia, serif;
+  color: var(--tpl-ink);
+  max-width: 880px;
+}
+
+.tpl-selector__header {
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--tpl-rule);
+  padding-bottom: 12px;
+}
+
+.tpl-selector__eyebrow {
+  display: block;
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-rule);
+  margin-bottom: 6px;
+}
+
+.tpl-selector__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.tpl-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 560px) {
+  .tpl-selector__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tpl-card {
+  position: relative;
+  text-align: left;
+  cursor: pointer;
+  background: var(--tpl-paper-raised);
+  border: 1px solid var(--tpl-rule);
+  border-radius: 2px;
+  padding: 22px 18px 40px 34px;
+  box-shadow: 2px 2px 0 rgba(38, 34, 32, 0.06);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+  font-family: inherit;
+  color: inherit;
+}
+
+.tpl-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 4px 0 rgba(38, 34, 32, 0.1);
+}
+
+.tpl-card:focus-visible {
+  outline: 2px solid var(--tpl-brass);
+  outline-offset: 3px;
+}
+
+.tpl-card--selected {
+  border-color: var(--tpl-brass);
+  box-shadow: 3px 4px 0 rgba(156, 124, 56, 0.28);
+}
+
+/* 우상단 코너 마운트 (사진 모서리 고정 장식) */
+.tpl-card__corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 30px 30px 0;
+  border-color: transparent var(--tpl-rule) transparent transparent;
+}
+
+.tpl-card__letter {
+  display: inline-block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.tpl-card__tag {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tpl-ink-soft);
+  vertical-align: middle;
+}
+
+.tpl-card__label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.tpl-card__row {
+  display: block;
+  margin-top: 10px;
+}
+
+.tpl-card__row-label {
+  display: block;
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--tpl-brass);
+  margin-bottom: 3px;
+}
+
+.tpl-card__row-value {
+  display: block;
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tpl-ink-soft);
+}
+
+.tpl-card__stamp {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  border: 2px solid var(--tpl-stamp);
+  color: var(--tpl-stamp);
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  transform: rotate(-6deg);
+}
