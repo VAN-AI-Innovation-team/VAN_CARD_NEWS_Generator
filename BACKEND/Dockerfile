@@ -1,5 +1,5 @@
 # Build Stage
-FROM eclipse-temurin:26-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /web
 
@@ -15,7 +15,7 @@ COPY src src
 RUN ./gradlew clean bootJar --no-daemon
 
 # Runtime Stage
-FROM eclipse-temurin:26-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /web
 
@@ -25,7 +25,10 @@ RUN addgroup --system spring \
 
 COPY --from=builder /web/build/libs/*.jar web.jar
 
-RUN chown spring:spring /web/web.jar
+# 애플리케이션 파일 및 업로드 디렉터리 권한 설정
+RUN mkdir -p /app/uploads \
+    && chown -R spring:spring /app/uploads \
+    && chown spring:spring /web/web.jar
 
 USER spring:spring
 

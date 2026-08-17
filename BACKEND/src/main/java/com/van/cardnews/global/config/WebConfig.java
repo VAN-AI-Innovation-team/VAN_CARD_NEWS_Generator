@@ -1,7 +1,9 @@
-package org.example.backend.config;
+package com.van.cardnews.global.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -9,28 +11,45 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
+@EnableAsync
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+    @Value("${app.cors.allowed-origins}")
+    private String[] allowedOrigins;
+
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        registry.addMapping("/api/**")
+                .allowedOrigins(allowedOrigins)
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
 
-    // 1. 스프링 시큐리티가 CORS를 차단하지 않도록 연동해 주는 설정 빈
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 경로 끝에 슬래시(/) 처리 보장
+        String location = uploadDir.endsWith("/") ? uploadDir : uploadDir + "/";
+
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations("file:" + location);
+    }
+
+    // Spring Security CORS 연동 빈
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedOrigins(List.of(allowedOrigins));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
@@ -39,14 +58,15 @@ public class WebConfig implements WebMvcConfigurer {
         return source;
     }
 
-    // 2. /api/** 경로는 로그인 검사 없이 누구나 접근할 수 있게 열어주는 시큐리티 설정 빈(테스트의 편의성을 위한 것으로 추후 수정)
+    // Spring Security 필터 체인 설정
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // 위에서 만든 CORS 설정 적용
-                .csrf(csrf -> csrf.disable())    // 개발 중이므로 CSRF 보안 비활성화
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**").permitAll() // /api로 시작하는 요청은 프리패스!
+                        // [수정] /uploads/** 경로를 추가하여 이미지 파일 접근 허용
+                        .requestMatchers("/api/**", "/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 );
 
