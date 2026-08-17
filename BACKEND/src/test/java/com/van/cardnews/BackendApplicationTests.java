@@ -1,4 +1,4 @@
-package org.example.backend;
+package com.van.cardnews;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
