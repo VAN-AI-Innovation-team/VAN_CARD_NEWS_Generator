@@ -1,11 +1,12 @@
 package com.van.cardnews.domain.content.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 /**
- * 폼에서 전달되는 텍스트 데이터.
- * multipart/form-data 요청에서 "data" 파트(Content-Type: application/json)로 전달됩니다.
+ * 카드뉴스 생성 요청 텍스트 데이터.
  */
 public record ContentCreateRequest(
 
@@ -17,7 +18,8 @@ public record ContentCreateRequest(
         @Size(max = 2000, message = "본문은 2000자를 초과할 수 없습니다.")
         String body,
 
-        @NotBlank(message = "템플릿은 필수입니다.")
-        String template
+        @NotNull(message = "템플릿은 필수입니다.")
+        @Positive(message = "템플릿 ID는 0보다 커야 합니다.")
+        Long templateId
 ) {
 }
