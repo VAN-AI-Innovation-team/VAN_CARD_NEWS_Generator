@@ -8,10 +8,15 @@ export interface PostInputFormSubmitPayload {
 }
 
 interface PostInputFormProps {
-  onSubmit?: (payload: PostInputFormSubmitPayload) => void;
-  //최대 업로드 가능 이미지 개수
+  onChange?: (payload: PostInputFormSubmitPayload) => void;
+
+  // 이전 단계로 돌아왔을 때 기존 입력값 복원
+  initialData?: PostInputFormSubmitPayload | null;
+
+  // 최대 업로드 가능 이미지 개수
   maxImages?: number;
-  //이미지 1장당 최대 용량(MB)
+
+  // 이미지 1장당 최대 용량(MB)
   maxImageSizeMB?: number;
 }
 
@@ -25,40 +30,96 @@ const TITLE_MAX_LENGTH = 40;
 const BODY_MAX_LENGTH = 1000;
 
 function PostInputForm({
-  onSubmit,
+  onChange,
+  initialData,
   maxImages = 10,
   maxImageSizeMB = 10,
 }: PostInputFormProps) {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [title, setTitle] = useState(initialData?.title ?? '');
+  const [body, setBody] = useState(initialData?.body ?? '');
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 컴포넌트가 사라지거나 이미지 목록이 바뀔 때, 만들어둔 objectURL을 해제해서
-  // 메모리 누수를 막는다. (브라우저가 만든 임시 미리보기 주소는 직접 정리해야 함)
+  /**
+   * 이전 단계에서 돌아왔을 때
+   * App에서 저장하고 있던 입력값을 복원합니다.
+   */
+  useEffect(() => {
+    if (!initialData) {
+      return;
+    }
+
+    setTitle(initialData.title);
+    setBody(initialData.body);
+
+    const restoredImages: ImageItem[] = initialData.images.map(
+      (file, index) => ({
+        id: `${file.name}-${file.lastModified}-${index}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }),
+    );
+
+    setImages((previousImages) => {
+      previousImages.forEach((image) => {
+        URL.revokeObjectURL(image.previewUrl);
+      });
+
+      return restoredImages;
+    });
+  }, [initialData]);
+
+  /**
+   * 컴포넌트가 사라지거나 이미지 목록이 변경될 때
+   * object URL을 정리합니다.
+   */
   useEffect(() => {
     return () => {
-      images.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+      images.forEach((image) => {
+        URL.revokeObjectURL(image.previewUrl);
+      });
     };
   }, [images]);
 
-  const isFormValid =
-    title.trim().length > 0 && body.trim().length > 0 && images.length > 0;
+  /**
+   * 현재 입력값을 App으로 전달합니다.
+   */
+  function notifyChange(
+    nextTitle: string,
+    nextBody: string,
+    nextImages: ImageItem[],
+  ) {
+    onChange?.({
+      title: nextTitle,
+      body: nextBody,
+      images: nextImages.map((image) => image.file),
+    });
+  }
 
   function handleTitleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setTitle(event.target.value.slice(0, TITLE_MAX_LENGTH));
+    const nextTitle = event.target.value.slice(0, TITLE_MAX_LENGTH);
+
+    setTitle(nextTitle);
+
+    notifyChange(nextTitle, body, images);
   }
 
   function handleBodyChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
-    setBody(event.target.value.slice(0, BODY_MAX_LENGTH));
+    const nextBody = event.target.value.slice(0, BODY_MAX_LENGTH);
+
+    setBody(nextBody);
+
+    notifyChange(title, nextBody, images);
   }
 
   function addFiles(fileList: FileList) {
     const incomingFiles = Array.from(fileList);
+
     const validFiles: File[] = [];
+
     let rejectionReason = '';
 
     for (const file of incomingFiles) {
@@ -66,20 +127,26 @@ function PostInputForm({
         rejectionReason = '이미지 파일만 업로드할 수 있어요.';
         continue;
       }
+
       if (file.size > maxImageSizeMB * 1024 * 1024) {
         rejectionReason = `이미지 1장당 최대 ${maxImageSizeMB}MB까지 업로드할 수 있어요.`;
         continue;
       }
+
       validFiles.push(file);
     }
 
-    setImages((prev) => {
-      const remainingSlots = maxImages - prev.length;
+    setImages((previousImages) => {
+      const remainingSlots = maxImages - previousImages.length;
+
       if (remainingSlots <= 0) {
         setErrorMessage(`사진은 최대 ${maxImages}장까지 업로드할 수 있어요.`);
-        return prev;
+
+        return previousImages;
       }
+
       const filesToAdd = validFiles.slice(0, remainingSlots);
+
       const newItems: ImageItem[] = filesToAdd.map((file) => ({
         id: `${file.name}-${file.lastModified}-${Math.random()
           .toString(36)
@@ -87,7 +154,12 @@ function PostInputForm({
         file,
         previewUrl: URL.createObjectURL(file),
       }));
-      return [...prev, ...newItems];
+
+      const nextImages = [...previousImages, ...newItems];
+
+      notifyChange(title, body, nextImages);
+
+      return nextImages;
     });
 
     setErrorMessage(rejectionReason);
@@ -97,13 +169,15 @@ function PostInputForm({
     if (event.target.files && event.target.files.length > 0) {
       addFiles(event.target.files);
     }
-    // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 값 초기화
+
+    // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 초기화
     event.target.value = '';
   }
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragging(false);
+
     if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
       addFiles(event.dataTransfer.files);
     }
@@ -119,35 +193,30 @@ function PostInputForm({
   }
 
   function handleRemoveImage(id: string) {
-    setImages((prev) => {
-      const target = prev.find((image) => image.id === id);
+    setImages((previousImages) => {
+      const target = previousImages.find((image) => image.id === id);
+
       if (target) {
         URL.revokeObjectURL(target.previewUrl);
       }
-      return prev.filter((image) => image.id !== id);
-    });
-  }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!isFormValid) {
-      setErrorMessage('제목, 본문, 사진을 모두 입력해주세요.');
-      return;
-    }
-    onSubmit?.({
-      title: title.trim(),
-      body: body.trim(),
-      images: images.map((image) => image.file),
+      const nextImages = previousImages.filter((image) => image.id !== id);
+
+      notifyChange(title, body, nextImages);
+
+      return nextImages;
     });
   }
 
   return (
-    <form className={styles.card} onSubmit={handleSubmit} noValidate>
+    <div className={styles.card}>
       <header className={styles.header}>
         <span className={styles.eyebrow}>카드뉴스 자동 생성</span>
+
         <h1 className={styles.heading}>새 콘텐츠 만들기</h1>
+
         <p className={styles.subheading}>
-          제목, 본문, 사진만 입력하면 자동으로 카드뉴스가 만들어져요.
+          제목, 본문, 사진을 입력한 후 다음 단계에서 사용할 템플릿을 선택합니다.
         </p>
       </header>
 
@@ -158,10 +227,12 @@ function PostInputForm({
             <span className={styles.fieldIndex}>01</span>
             제목
           </label>
+
           <span className={styles.counter}>
             {title.length} / {TITLE_MAX_LENGTH}
           </span>
         </div>
+
         <input
           id="post-title"
           type="text"
@@ -180,10 +251,12 @@ function PostInputForm({
             <span className={styles.fieldIndex}>02</span>
             본문
           </label>
+
           <span className={styles.counter}>
             {body.length} / {BODY_MAX_LENGTH}
           </span>
         </div>
+
         <textarea
           id="post-body"
           className={styles.textArea}
@@ -202,6 +275,7 @@ function PostInputForm({
             <span className={styles.fieldIndex}>03</span>
             사진
           </span>
+
           <span className={styles.counter}>
             {images.length} / {maxImages}
           </span>
@@ -226,9 +300,11 @@ function PostInputForm({
           <p className={styles.dropzoneText}>
             사진을 이곳에 끌어다 놓거나 <span>클릭해서 선택</span>하세요.
           </p>
+
           <p className={styles.dropzoneHint}>
             JPG, PNG · 장당 최대 {maxImageSizeMB}MB · 최대 {maxImages}장
           </p>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -248,6 +324,7 @@ function PostInputForm({
                   alt={image.file.name}
                   className={styles.thumbnailImage}
                 />
+
                 <button
                   type="button"
                   className={styles.thumbnailRemoveButton}
@@ -263,15 +340,7 @@ function PostInputForm({
       </section>
 
       {errorMessage && <p className={styles.errorText}>{errorMessage}</p>}
-
-      <button
-        type="submit"
-        className={styles.submitButton}
-        disabled={!isFormValid}
-      >
-        카드뉴스 만들기
-      </button>
-    </form>
+    </div>
   );
 }
 

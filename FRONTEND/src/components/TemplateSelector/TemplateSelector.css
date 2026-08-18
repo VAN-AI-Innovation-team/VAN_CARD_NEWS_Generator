@@ -1,182 +1,222 @@
-/*
- 디자인 컨셉: "학술 카탈로그 인덱스 카드" — Issue #5(입력 폼) 톤을 그대로 이어감
- - 종이 색 배경 + 세리프 마스트헤드 타이포
- - 우하단 코너 마운트(사진 모서리 고정 장식)
- - 선택 시 도서관 대출 스탬프처럼 살짝 회전된 "SELECTED" 인장이 찍힘
-*/
-
-:root {
-  --tpl-paper: #efeadf;
-  --tpl-paper-raised: #f7f3e9;
-  --tpl-ink: #262220;
-  --tpl-ink-soft: #6b6259;
-  --tpl-rule: #7a2e2e;
-  --tpl-brass: #9c7c38;
-  --tpl-stamp: #7a2e2e;
-}
-
 .tpl-selector {
-  font-family: 'Source Serif Pro', 'Noto Serif KR', Georgia, serif;
-  color: var(--tpl-ink);
-  max-width: 880px;
-  margin: 0 auto;
+  width: 100%;
 }
 
-.tpl-selector__header {
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--tpl-rule);
-  padding-bottom: 12px;
+/* =========================================
+   Selected Content Type
+========================================= */
+
+.tpl-selector__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 9px 14px;
+  border: 1px solid #d7e0ea;
+  border-radius: 6px;
+  background: #f6f8fb;
 }
 
-.tpl-selector__eyebrow {
-  display: block;
-  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+.tpl-selector__type-label {
+  color: #667085;
   font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--tpl-rule);
-  margin-bottom: 6px;
-}
-
-.tpl-selector__title {
-  margin: 0;
-  font-size: 22px;
   font-weight: 600;
 }
 
-.tpl-selector__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 18px;
+.tpl-selector__type strong {
+  color: #17365d;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-/* 모바일 전용 스타일 */
-@media (max-width: 560px) {
+/* =========================================
+   Template Grid
+========================================= */
+
+.tpl-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* =========================================
+   Template Card
+========================================= */
+
+.tpl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 260px;
+  padding: 24px;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172b4d;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tpl-card:hover {
+  border-color: #54779d;
+  box-shadow: 0 8px 24px rgba(23, 43, 77, 0.08);
+  transform: translateY(-2px);
+}
+
+.tpl-card:focus-visible {
+  outline: 3px solid rgba(39, 76, 119, 0.2);
+  outline-offset: 2px;
+}
+
+.tpl-card--recommended {
+  border-color: #9fb4c9;
+  background: #fbfcfe;
+}
+
+.tpl-card--selected {
+  border: 2px solid #17365d;
+  box-shadow: 0 8px 24px rgba(23, 54, 93, 0.12);
+}
+
+.tpl-card--selected:hover {
+  border-color: #17365d;
+}
+
+/* =========================================
+   Card Top
+========================================= */
+
+.tpl-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+/* =========================================
+   Recommendation Badge
+========================================= */
+
+.tpl-card__recommend {
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: #e9f0f7;
+  color: #274c77;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* =========================================
+   Card Text
+========================================= */
+
+.tpl-card__tag {
+  margin-bottom: 6px;
+  color: #6b7f95;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.tpl-card__label {
+  margin-bottom: 22px;
+  color: #172b4d;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tpl-card__row {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #edf0f3;
+}
+
+.tpl-card__row-label {
+  flex: 0 0 64px;
+  color: #7a8797;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tpl-card__row-value {
+  color: #4f5d6b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Selected State
+========================================= */
+
+.tpl-card__selected {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: #17365d;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* =========================================
+   Empty / Loading / Error
+========================================= */
+
+.tpl-selector__empty {
+  padding: 48px 24px;
+
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+
+  background: #f9fafc;
+
+  text-align: center;
+}
+
+.tpl-selector__empty-title {
+  margin: 0;
+
+  color: #27364d;
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tpl-selector__empty-description {
+  margin: 8px 0 0;
+
+  color: #7a8797;
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Responsive
+========================================= */
+
+@media (max-width: 768px) {
+  .tpl-selector__title {
+    font-size: 21px;
+  }
+
   .tpl-selector__grid {
     grid-template-columns: 1fr;
   }
 
-  /* 주요 내용 및 디자인 특징 영역 완벽 숨김 */
-  .tpl-card__row {
-    display: none !important;
-  }
-
-  /* 내부 하단 여백(40px -> 16px)을 줄여 카드 높이가 자동으로 콤팩트하게 줄어들도록 설정 */
   .tpl-card {
-    padding: 16px 16px 16px 20px;
+    min-height: auto;
   }
-
-  /* 줄어든 카드 높이에 맞춰 스탬프 위치 살짝 조정 */
-  .tpl-card__stamp {
-    bottom: 10px;
-    right: 10px;
-  }
-}
-
-.tpl-card {
-  position: relative;
-  text-align: left;
-  cursor: pointer;
-  background: var(--tpl-paper-raised);
-  border: 1px solid var(--tpl-rule);
-  border-radius: 2px;
-  padding: 22px 18px 40px 34px;
-  box-shadow: 2px 2px 0 rgba(38, 34, 32, 0.06);
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    border-color 120ms ease;
-  font-family: inherit;
-  color: inherit;
-}
-
-.tpl-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 3px 4px 0 rgba(38, 34, 32, 0.1);
-}
-
-.tpl-card:focus-visible {
-  outline: 2px solid var(--tpl-brass);
-  outline-offset: 3px;
-}
-
-.tpl-card--selected {
-  border-color: var(--tpl-brass);
-  box-shadow: 3px 4px 0 rgba(156, 124, 56, 0.28);
-}
-
-/* 우상단 코너 마운트 (사진 모서리 고정 장식) */
-.tpl-card__corner {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 0 30px 30px 0;
-  border-color: transparent var(--tpl-rule) transparent transparent;
-}
-
-.tpl-card__letter {
-  display: inline-block;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 6px;
-}
-
-.tpl-card__tag {
-  display: inline-block;
-  margin-left: 8px;
-  font-family: 'Inter', 'Noto Sans KR', sans-serif;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tpl-ink-soft);
-  vertical-align: middle;
-}
-
-.tpl-card__label {
-  display: block;
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.tpl-card__row {
-  display: block;
-  margin-top: 10px;
-}
-
-.tpl-card__row-label {
-  display: block;
-  font-family: 'Inter', 'Noto Sans KR', sans-serif;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--tpl-brass);
-  margin-bottom: 3px;
-}
-
-.tpl-card__row-value {
-  display: block;
-  font-family: 'Inter', 'Noto Sans KR', sans-serif;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--tpl-ink-soft);
-}
-
-.tpl-card__stamp {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  border: 2px solid var(--tpl-stamp);
-  color: var(--tpl-stamp);
-  font-family: 'Inter', 'Noto Sans KR', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 3px 8px;
-  border-radius: 3px;
-  transform: rotate(-6deg);
 }
