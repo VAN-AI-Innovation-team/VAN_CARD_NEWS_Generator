@@ -1,0 +1,204 @@
+.content-type-selector {
+  width: 100%;
+}
+
+/* =========================================
+   Content Type Grid
+========================================= */
+
+.content-type-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* =========================================
+   Content Type Card
+========================================= */
+
+.content-type-card {
+  position: relative;
+
+  min-height: 190px;
+  padding: 24px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  border: 1px solid #dce2ea;
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  color: #172033;
+  font-family: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.content-type-card:hover {
+  border-color: #9eabc0;
+  background: #fbfcfe;
+  box-shadow: 0 4px 12px rgba(19, 37, 63, 0.06);
+}
+
+.content-type-card:focus-visible {
+  outline: 2px solid #315985;
+  outline-offset: 2px;
+}
+
+.content-type-card--selected {
+  border-color: #173d73;
+  background: #f6f9fd;
+  box-shadow:
+    0 0 0 1px #173d73,
+    0 5px 14px rgba(23, 61, 115, 0.08);
+}
+
+.content-type-card--selected:hover {
+  border-color: #173d73;
+  background: #f6f9fd;
+}
+
+/* =========================================
+   Card Top
+========================================= */
+
+.content-type-card__top {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 28px;
+}
+
+.content-type-card__number {
+  color: #8994a6;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.content-type-card--selected .content-type-card__number {
+  color: #315985;
+}
+
+/* =========================================
+   Radio
+========================================= */
+
+.content-type-card__radio {
+  width: 18px;
+  height: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #c5cdd9;
+  border-radius: 50%;
+
+  background: #ffffff;
+}
+
+.content-type-card__radio--selected {
+  border-color: #173d73;
+}
+
+.content-type-card__radio-dot {
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+  background: #173d73;
+}
+
+/* =========================================
+   Card Text
+========================================= */
+
+.content-type-card__label {
+  margin-bottom: 8px;
+
+  color: #172033;
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+}
+
+.content-type-card--selected .content-type-card__label {
+  color: #173d73;
+}
+
+.content-type-card__description {
+  color: #6d798c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Select Indicator
+========================================= */
+
+.content-type-card__select {
+  margin-top: auto;
+  padding-top: 20px;
+
+  color: #9aa4b4;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.content-type-card--selected .content-type-card__select {
+  color: #315985;
+}
+
+/* =========================================
+   Hint
+========================================= */
+
+.content-type-selector__hint {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+
+  border-left: 3px solid #315985;
+
+  background: #f5f7fa;
+
+  color: #6c788b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Responsive
+========================================= */
+
+@media (max-width: 700px) {
+  .content-type-selector__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content-type-card {
+    min-height: 150px;
+    padding: 20px;
+  }
+
+  .content-type-card__top {
+    margin-bottom: 20px;
+  }
+
+  .content-type-card__label {
+    font-size: 20px;
+  }
+}
