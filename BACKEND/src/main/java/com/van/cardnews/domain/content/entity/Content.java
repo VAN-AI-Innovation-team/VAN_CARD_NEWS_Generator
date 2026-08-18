@@ -1,5 +1,6 @@
 package com.van.cardnews.domain.content.entity;
 
+import com.van.cardnews.domain.template.entity.Template;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -12,9 +13,6 @@ import java.util.List;
 
 /**
  * 사용자가 입력한 카드뉴스 생성 요청 원본 데이터.
- * contents 테이블 및 content_images 테이블과 매핑되는 엔티티입니다.
- *   - status: 발행 상태 (DRAFT, PUBLISHED, ARCHIVED)
- *   - images: content_images 테이블과 1:N 양방향 연관관계
  */
 @Entity
 @Table(name = "contents")
@@ -32,15 +30,27 @@ public class Content {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
-    /** 카드뉴스 템플릿 종류 (예: academic_index_card 등) */
-    @Column(length = 100)
-    private String template;
+    /**
+     * 생성 당시 사용한 특정 템플릿 버전을 참조합니다.
+     *
+     * 예:
+     * template.id = A v1
+     *
+     * 이후 A v2가 생성되어도 기존 Content는 A v1을 계속 참조합니다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "template_id", nullable = false)
+    private Template template;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ContentStatus status;
 
-    @OneToMany(mappedBy = "content", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(
+            mappedBy = "content",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
     private List<ContentImage> images = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
@@ -50,14 +60,22 @@ public class Content {
     private LocalDateTime updatedAt;
 
     @Builder
-    private Content(String title, String body, String template) {
+    private Content(
+            String title,
+            String body,
+            Template template
+    ) {
         this.title = title;
         this.body = body;
         this.template = template;
         this.status = ContentStatus.DRAFT;
     }
 
-    public static Content create(String title, String body, String template) {
+    public static Content create(
+            String title,
+            String body,
+            Template template
+    ) {
         return Content.builder()
                 .title(title)
                 .body(body)
@@ -74,7 +92,6 @@ public class Content {
         this.status = ContentStatus.PUBLISHED;
     }
 
-    /** 하드 삭제 대신 사용하는 소프트 삭제 (job_histories FK가 RESTRICT 제약조건임) */
     public void archive() {
         this.status = ContentStatus.ARCHIVED;
     }
