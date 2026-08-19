@@ -24,6 +24,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
+    // Claude Java SDK
+    implementation 'com.anthropic:anthropic-java:2.52.0'
+
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'org.postgresql:postgresql'
@@ -33,7 +36,6 @@ dependencies {
 
     annotationProcessor 'org.projectlombok:lombok'
 
-    // 테스트 의존성은 spring-boot-starter-test 하나로 통합해서 관리합니다
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     testCompileOnly 'org.projectlombok:lombok'
