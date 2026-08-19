@@ -12,6 +12,7 @@ import com.van.cardnews.domain.template.repository.TemplateRepository;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,25 +85,25 @@ public class TemplateService {
     /**
      * 신규 템플릿 등록
      *
+     * code는 contentType에 따라 서버가 자동으로 확정합니다.
+     * 형식: {접두문자}{일련번호} (예: A1, A2, B1 ...)
      * 새 code는 항상 version 1로 시작합니다.
+     *
+     * 동시성 참고: 매우 드문 경우지만 같은 contentType에 대한
+     * 등록 요청이 정확히 동시에 들어오면 동일한 code가 계산되어
+     * DB 유니크 제약(uk_templates_code_version) 위반이 발생할 수
+     * 있습니다. 이 경우 명확한 오류를 반환하므로 클라이언트가
+     * 재요청하면 됩니다. 관리자가 수동으로 저빈도로 수행하는
+     * 작업이므로 이 정도 처리로 충분합니다.
      */
     @Transactional
     public TemplateResponse createTemplate(
             TemplateCreateRequest request
     ) {
-        if (templateRepository
-                .findTopByCodeOrderByVersionDesc(request.code())
-                .isPresent()) {
-
-            throw new CustomException(
-                    ErrorCode.TEMPLATE_CODE_ALREADY_EXISTS,
-                    "이미 존재하는 템플릿 코드입니다: " +
-                            request.code()
-            );
-        }
-
         TemplateContentType contentType =
                 parseContentType(request.contentType());
+
+        String code = generateNextCode(contentType);
 
         JsonNode layoutDefinition =
                 objectMapper.valueToTree(
@@ -116,7 +117,7 @@ public class TemplateService {
 
         Template template =
                 Template.create(
-                        request.code(),
+                        code,
                         request.name(),
                         contentType,
                         request.canvasWidth(),
@@ -125,9 +126,41 @@ public class TemplateService {
                         designTokens
                 );
 
-        templateRepository.save(template);
+        try {
+            // saveAndFlush로 즉시 INSERT를 실행해 유니크 제약 위반을
+            // 이 메서드 안에서 바로 감지합니다.
+            templateRepository.saveAndFlush(template);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(
+                    ErrorCode.TEMPLATE_CODE_ALREADY_EXISTS,
+                    "템플릿 코드 생성 중 충돌이 발생했습니다. 다시 시도해주세요: " + code
+            );
+        }
 
         return TemplateResponse.from(template);
+    }
+
+    /**
+     * 콘텐츠 유형에 해당하는 다음 템플릿 code를 계산합니다.
+     *
+     * 형식: {접두문자}{일련번호} (예: A1, A2 ...)
+     * 접두문자 뒤에 붙은 숫자 중 최댓값 + 1을 다음 번호로 사용합니다.
+     */
+    private String generateNextCode(TemplateContentType contentType) {
+        String prefix = contentType.getCodePrefix();
+
+        List<String> existingCodes =
+                templateRepository.findDistinctCodeByCodeStartingWith(prefix);
+
+        int nextSequence = existingCodes.stream()
+                .map(c -> c.substring(prefix.length()))
+                .filter(seq -> seq.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0)
+                + 1;
+
+        return prefix + nextSequence;
     }
 
     /**

@@ -1,0 +1,187 @@
+{
+  "name": "인용 카드뉴스 - 정사각형(1:1)",
+  "contentType": "quote",
+  "canvasWidth": 1080,
+  "canvasHeight": 1080,
+  "layoutDefinition": {
+    "type": "quote-center",
+    "description": "남색 배경 전체에 대형 따옴표 장식과 중앙 정렬 인용구, 하단 출처가 이미지 없이 배치된 텍스트 중심의 레이아웃입니다.",
+    "cards": {
+      "cover": {
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "quoteMark": {
+            "role": "decoration",
+            "x": 10,
+            "y": 12,
+            "width": 20,
+            "height": 14,
+            "text": "“",
+            "colorToken": "accent",
+            "typographyToken": "quoteMark",
+            "layer": 3
+          },
+          "quoteText": {
+            "role": "body",
+            "x": 10,
+            "y": 30,
+            "width": 80,
+            "height": 45,
+            "maxChars": 90,
+            "align": "center",
+            "colorToken": "textOnDark",
+            "typographyToken": "quote",
+            "layer": 3
+          },
+          "source": {
+            "role": "footer",
+            "x": 10,
+            "y": 82,
+            "width": 80,
+            "height": 8,
+            "maxChars": 30,
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "footer",
+            "layer": 3
+          }
+        },
+        "type": "quote-center",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
+      },
+      "content": {
+        "type": "quote-center",
+        "description": "인용형 본문 반복 카드. 큰 따옴표 장식과 중앙 정렬 인용문, 하단 출처라는 기존 인용 템플릿의 핵심 구성을 반복합니다.",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "quoteMark": {
+            "role": "decoration",
+            "x": 10,
+            "y": 10,
+            "width": 18,
+            "height": 10,
+            "text": "“",
+            "colorToken": "accent",
+            "typographyToken": "quoteMark",
+            "layer": 3
+          },
+          "quoteText": {
+            "role": "body",
+            "x": 10,
+            "y": 24,
+            "width": 80,
+            "height": 50,
+            "maxChars": 110,
+            "align": "center",
+            "colorToken": "textOnDark",
+            "typographyToken": "quote",
+            "layer": 3
+          },
+          "source": {
+            "role": "footer",
+            "x": 10,
+            "y": 84,
+            "width": 80,
+            "height": 7,
+            "maxChars": 30,
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "footer",
+            "layer": 3
+          }
+        }
+      },
+      "closing": {
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "brand": {
+            "role": "eyebrow",
+            "x": 10,
+            "y": 29,
+            "width": 80,
+            "height": 7,
+            "text": "VAN",
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "cta": {
+            "role": "title",
+            "x": 10,
+            "y": 43,
+            "width": 80,
+            "height": 18,
+            "maxChars": 20,
+            "align": "center",
+            "text": "VAN과 함께하기",
+            "colorToken": "textOnDark",
+            "typographyToken": "title",
+            "layer": 3
+          }
+        },
+        "type": "brand-closing",
+        "description": "인용형 브랜드 마무리 카드. 남색 배경과 VAN 연결 CTA로 카드 세트를 종료합니다."
+      }
+    }
+  },
+  "designTokens": {
+    "colors": {
+      "background": "#ffffff",
+      "surface": "#f4f6f9",
+      "primary": "#173d73",
+      "primaryDark": "#102a56",
+      "accent": "#315985",
+      "border": "#dce2ea",
+      "textPrimary": "#172033",
+      "textSecondary": "#68758a",
+      "textOnDark": "#ffffff",
+      "overlay": "rgba(16,42,86,0.55)"
+    },
+    "typography": {
+      "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
+      "eyebrowSize": "22px",
+      "eyebrowWeight": "700",
+      "eyebrowLetterSpacing": "1.5px",
+      "titleSize": "56px",
+      "titleWeight": "800",
+      "titleLineHeight": "1.25",
+      "bodySize": "32px",
+      "bodyWeight": "400",
+      "bodyLineHeight": "1.6",
+      "highlightSize": "30px",
+      "highlightWeight": "700",
+      "footerSize": "22px",
+      "footerWeight": "500",
+      "quoteMarkSize": "120px",
+      "quoteMarkWeight": "800",
+      "quoteSize": "44px",
+      "quoteWeight": "700",
+      "quoteLineHeight": "1.45"
+    }
+  }
+}

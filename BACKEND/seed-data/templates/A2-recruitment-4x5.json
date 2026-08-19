@@ -1,0 +1,223 @@
+{
+  "name": "모집 카드뉴스 - 직사각형(4:5)",
+  "contentType": "recruitment",
+  "canvasWidth": 1080,
+  "canvasHeight": 1350,
+  "layoutDefinition": {
+    "type": "image-panel-bottom",
+    "description": "세로형 이미지와 하단의 흰색 패널을 결합한 구조로, 이미지 아래에 간단한 소개 본문과 모집 정보를 함께 배치한 레이아웃입니다.",
+    "cards": {
+      "cover": {
+        "elements": {
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 62,
+            "cropRatio": "4:3",
+            "layer": 1
+          },
+          "panel": {
+            "role": "panel",
+            "x": 0,
+            "y": 62,
+            "width": 100,
+            "height": 38,
+            "colorToken": "background",
+            "layer": 2
+          },
+          "eyebrow": {
+            "role": "eyebrow",
+            "x": 7,
+            "y": 66,
+            "width": 86,
+            "height": 5,
+            "text": "MEMBER RECRUITMENT",
+            "colorToken": "primary",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "title": {
+            "role": "title",
+            "x": 7,
+            "y": 72,
+            "width": 86,
+            "height": 13,
+            "maxChars": 26,
+            "align": "left",
+            "colorToken": "textPrimary",
+            "typographyToken": "title",
+            "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 95,
+            "width": 50,
+            "height": 4,
+            "maxChars": 18,
+            "align": "center",
+            "shape": "badge",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3
+          }
+        },
+        "type": "image-panel-bottom",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
+      },
+      "content": {
+        "type": "image-highlight-body",
+        "description": "모집형 본문 반복 카드. 모집 템플릿의 이미지 중심 구성과 강조 배지 특성을 유지하면서 본문을 카드 단위로 반복 배치합니다.",
+        "elements": {
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 48,
+            "cropRatio": "4:3",
+            "layer": 1
+          },
+          "panel": {
+            "role": "panel",
+            "x": 0,
+            "y": 48,
+            "width": 100,
+            "height": 52,
+            "colorToken": "background",
+            "layer": 2
+          },
+          "sectionLabel": {
+            "role": "eyebrow",
+            "x": 7,
+            "y": 54,
+            "width": 50,
+            "height": 5,
+            "text": "MEMBER RECRUITMENT",
+            "maxChars": 22,
+            "align": "left",
+            "colorToken": "primary",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "title": {
+            "role": "title",
+            "x": 7,
+            "y": 62,
+            "width": 86,
+            "height": 14,
+            "maxChars": 28,
+            "align": "left",
+            "colorToken": "textPrimary",
+            "typographyToken": "title",
+            "layer": 3
+          },
+          "body": {
+            "role": "body",
+            "x": 7,
+            "y": 77,
+            "width": 86,
+            "height": 14,
+            "maxChars": 100,
+            "align": "left",
+            "colorToken": "textSecondary",
+            "typographyToken": "body",
+            "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 94,
+            "width": 50,
+            "height": 4,
+            "maxChars": 18,
+            "align": "center",
+            "shape": "badge",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3
+          }
+        }
+      },
+      "closing": {
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "brand": {
+            "role": "eyebrow",
+            "x": 10,
+            "y": 29,
+            "width": 80,
+            "height": 7,
+            "text": "VAN",
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "cta": {
+            "role": "title",
+            "x": 10,
+            "y": 43,
+            "width": 80,
+            "height": 18,
+            "maxChars": 20,
+            "align": "center",
+            "text": "지금 지원하기",
+            "colorToken": "textOnDark",
+            "typographyToken": "title",
+            "layer": 3
+          }
+        },
+        "type": "brand-closing",
+        "description": "모집형 브랜드 마무리 카드. 남색 배경과 지원 CTA로 카드 세트를 종료합니다."
+      }
+    }
+  },
+  "designTokens": {
+    "colors": {
+      "background": "#ffffff",
+      "surface": "#f4f6f9",
+      "primary": "#173d73",
+      "primaryDark": "#102a56",
+      "accent": "#315985",
+      "border": "#dce2ea",
+      "textPrimary": "#172033",
+      "textSecondary": "#68758a",
+      "textOnDark": "#ffffff",
+      "overlay": "rgba(16,42,86,0.55)"
+    },
+    "typography": {
+      "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
+      "eyebrowSize": "22px",
+      "eyebrowWeight": "700",
+      "eyebrowLetterSpacing": "1.5px",
+      "titleSize": "56px",
+      "titleWeight": "800",
+      "titleLineHeight": "1.25",
+      "bodySize": "32px",
+      "bodyWeight": "400",
+      "bodyLineHeight": "1.6",
+      "highlightSize": "30px",
+      "highlightWeight": "700",
+      "footerSize": "22px",
+      "footerWeight": "500",
+      "quoteMarkSize": "120px",
+      "quoteMarkWeight": "800",
+      "quoteSize": "44px",
+      "quoteWeight": "700",
+      "quoteLineHeight": "1.45"
+    }
+  }
+}

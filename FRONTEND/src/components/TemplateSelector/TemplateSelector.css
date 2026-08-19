@@ -81,8 +81,10 @@
 }
 
 .tpl-card--selected {
-  border: 2px solid #17365d;
-  box-shadow: 0 8px 24px rgba(23, 54, 93, 0.12);
+  border-color: #17365d;
+  box-shadow:
+    inset 0 0 0 1px #17365d,
+    0 8px 24px rgba(23, 54, 93, 0.12);
 }
 
 .tpl-card--selected:hover {
