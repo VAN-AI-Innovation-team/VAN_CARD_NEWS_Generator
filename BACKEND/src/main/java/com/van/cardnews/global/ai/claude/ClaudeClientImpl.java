@@ -171,11 +171,11 @@ public class ClaudeClientImpl implements ClaudeClient {
                 %s
 
                 [작성 규칙]
-                1. cover에는 표지 제목, 강조 문구, imageId를 구성합니다.
+                1. cover에는 표지 제목, 강조 문구, imageId, 그리고 적절한 크롭 영역(cropArea: x, y, width, height)을 구성합니다.
                 2. content는 본문을 의미 단위로 나눕니다.
-                3. 각 content 카드에 적절한 imageId를 선택합니다.
+                3. 각 content 카드에 적절한 imageId와 크롭 영역(cropArea: x, y, width, height)을 반드시 포함합니다.
                 4. 같은 이미지를 여러 카드에서 재사용할 수 있습니다.
-                5. closing에는 imageId를 넣지 않습니다.
+                5. closing에는 imageId와 cropArea를 넣지 않습니다.
                 6. title, body, highlight는 입력 원문에 근거해야 합니다.
                 7. highlight는 날짜, 숫자, 핵심 조건, 대상, 핵심 행동 등을 우선합니다.
                 8. 문장을 글자 수 기준으로 단순 절단하지 말고 문맥을 유지합니다.

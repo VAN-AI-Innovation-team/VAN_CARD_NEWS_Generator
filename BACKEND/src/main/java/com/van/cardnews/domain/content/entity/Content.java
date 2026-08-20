@@ -1,11 +1,14 @@
 package com.van.cardnews.domain.content.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.van.cardnews.domain.template.entity.Template;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,14 +33,6 @@ public class Content {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
-    /**
-     * 생성 당시 사용한 특정 템플릿 버전을 참조합니다.
-     *
-     * 예:
-     * template.id = A v1
-     *
-     * 이후 A v2가 생성되어도 기존 Content는 A v1을 계속 참조합니다.
-     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "template_id", nullable = false)
     private Template template;
@@ -52,6 +47,16 @@ public class Content {
             orphanRemoval = true
     )
     private List<ContentImage> images = new ArrayList<>();
+
+    // 💡 1. 카드 생성 결과 필드 (CardGenerationService 등에서 사용)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "card_generation_result", columnDefinition = "json")
+    private JsonNode cardGenerationResult;
+
+    // 💡 2. 카드 이미지 배치 정보 필드 (ImagePlacementResolver, ContentPreviewResponse 등에서 사용)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "card_image_placements", columnDefinition = "json")
+    private JsonNode cardImagePlacements;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -86,6 +91,16 @@ public class Content {
     public void addImage(ContentImage image) {
         this.images.add(image);
         image.assignContent(this);
+    }
+
+    // 💡 1번 필드 업데이트 메서드
+    public void updateCardGenerationResult(JsonNode cardGenerationResult) {
+        this.cardGenerationResult = cardGenerationResult;
+    }
+
+    // 💡 2번 필드 업데이트 메서드
+    public void updateCardImagePlacements(JsonNode cardImagePlacements) {
+        this.cardImagePlacements = cardImagePlacements;
     }
 
     public void publish() {

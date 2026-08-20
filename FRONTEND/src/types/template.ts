@@ -39,7 +39,7 @@ export type LayoutElementRole =
 
 /**
  * layoutDefinition 안의 개별 요소.
- * x/y/width/height는 기존 시드 JSON과 동일하게 캔버스 대비 백분율 기준입니다.
+ * x/y/width/height는 캔버스 대비 백분율 기준입니다.
  */
 export interface LayoutElement {
   role: LayoutElementRole;
@@ -61,8 +61,9 @@ export interface LayoutElement {
 
 /**
  * 카드 1장에 대한 레이아웃 정의.
+ *
  * cover: 템플릿별 표지 레이아웃
- * content: AI가 본문을 여러 장으로 분할할 때 반복 사용하는 단일 레이아웃
+ * content: AI가 본문을 여러 장으로 분할할 때 반복 사용하는 레이아웃
  * closing: 카드 세트 마지막에 사용하는 브랜드 마무리 레이아웃
  */
 export interface LayoutCard {
@@ -77,6 +78,7 @@ export interface LayoutCard {
 
 /**
  * 템플릿의 전체 카드 레이아웃.
+ *
  * 3분할 표지 옵션은 cards.cover에만 적용하며
  * cards.content / cards.closing에는 적용하지 않습니다.
  */
@@ -99,20 +101,26 @@ export interface DesignTokens {
 /**
  * 템플릿 데이터
  *
- * 관리자 워크스페이스에서 관리되는 템플릿의
- * 사용자 조회용 API 모델과 대응합니다.
+ * 템플릿 하나는 하나의 콘텐츠 유형에 속합니다.
+ * 예:
+ * - A1 → recruitment
+ * - B1 → event
+ * - C1 → news
+ * - D1 → quote
+ *
+ * 여러 콘텐츠 유형에 대응하는 템플릿은 현재 사용하지 않습니다.
  */
 export interface Template {
   id: number;
 
-  /** 내부 관리 코드 A~D */
+  /** 내부 관리 코드 A1, A2, B1 ... */
   code: TemplateCode;
 
   /** 사용자에게 표시할 템플릿 이름 */
   name: string;
 
-  /** 이 템플릿이 적용 가능한 콘텐츠 유형 */
-  contentTypes: ContentType[];
+  /** 이 템플릿이 적용되는 콘텐츠 유형 */
+  contentType: ContentType;
 
   /** 카드뉴스 캔버스 규격 */
   canvas: CanvasSize;

@@ -26,6 +26,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${app.upload.dir}")
     private String uploadDir;
 
+    @Value("${app.generated.dir}")
+    private String generatedDir;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
@@ -35,13 +38,18 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
+    // 하나의 메서드 안에서 리소스 핸들러를 여러 개 등록하도록 통합
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 경로 끝에 슬래시(/) 처리 보장
-        String location = uploadDir.endsWith("/") ? uploadDir : uploadDir + "/";
-
+        // 1. 업로드 폴더 매핑
+        String uploadLocation = uploadDir.endsWith("/") ? uploadDir : uploadDir + "/";
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + location);
+                .addResourceLocations("file:" + uploadLocation);
+
+        // 2. 생성된 폴더 매핑
+        String generatedLocation = generatedDir.endsWith("/") ? generatedDir : generatedDir + "/";
+        registry.addResourceHandler("/generated/**")
+                .addResourceLocations("file:" + generatedLocation);
     }
 
     // Spring Security CORS 연동 빈
@@ -65,8 +73,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // [수정] /uploads/** 경로를 추가하여 이미지 파일 접근 허용
-                        .requestMatchers("/api/**", "/uploads/**").permitAll()
+                        .requestMatchers("/api/**", "/uploads/**", "/generated/**").permitAll()
                         .anyRequest().authenticated()
                 );
 

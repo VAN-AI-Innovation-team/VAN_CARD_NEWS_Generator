@@ -1,0 +1,61 @@
+.card-news-preview {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  overflow: hidden;
+  background: #ffffff;
+  font-family:
+    'Pretendard',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+.card-news-preview__element {
+  position: absolute;
+  overflow: hidden;
+}
+
+.card-news-preview__image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.card-news-preview__text {
+  display: flex;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow: hidden;
+}
+
+.card-news-preview__text--eyebrow {
+  align-items: center;
+  font-size: 2.2%;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.card-news-preview__text--title {
+  align-items: center;
+  font-size: 5.2%;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.card-news-preview__text--body {
+  align-items: flex-start;
+  font-size: 3%;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.card-news-preview__text--highlight {
+  align-items: center;
+  justify-content: center;
+  font-size: 2.8%;
+  line-height: 1.2;
+  font-weight: 700;
+}
