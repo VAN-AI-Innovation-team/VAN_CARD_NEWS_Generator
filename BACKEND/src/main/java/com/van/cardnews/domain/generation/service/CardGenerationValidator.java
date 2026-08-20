@@ -1,22 +1,16 @@
 package com.van.cardnews.domain.generation.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class CardGenerationValidator {
 
-    private final ObjectMapper objectMapper;
+    private static final int DEFAULT_MAX_CHARS = 50;
 
     /**
      * Claude가 반환한 최초 결과를 검증합니다.
-     *
-     * 이 시점에서는 cropArea가 아직 계산되지 않았으므로
-     * 텍스트 / 카드 구조 / imageId만 검증합니다.
      */
     public void validateInitial(
             CardGenerationResult result,
@@ -28,15 +22,16 @@ public class CardGenerationValidator {
             );
         }
 
-        validateJson(
-                objectMapper.valueToTree(result),
-                layoutDefinition,
-                false
+        validateJsonInternal(
+                result,
+                layoutDefinition
         );
     }
 
     /**
-     * cropArea까지 포함된 최종 카드 구성 결과를 검증합니다.
+     * 기존 호출부와의 호환을 위해 메서드는 유지합니다.
+     *
+     * 현재 구조에서는 cropArea를 필수로 검사하지 않습니다.
      */
     public void validateFinal(
             CardGenerationResult result,
@@ -48,67 +43,62 @@ public class CardGenerationValidator {
             );
         }
 
-        validateJson(
-                objectMapper.valueToTree(result),
-                layoutDefinition,
-                true
+        validateJsonInternal(
+                result,
+                layoutDefinition
         );
     }
 
     /**
-     * 수정된 카드 구성 결과를 검증합니다.
+     * ContentService 등 외부에서 카드 구성 결과를 검증할 때 사용합니다.
      *
-     * 수정 결과는 이미 cropArea가 포함된 결과를 저장하므로
-     * cropArea까지 검증합니다.
+     * cropArea는 검증하지 않습니다.
      */
     public static void validateJson(
-            JsonNode result,
+            CardGenerationResult result,
             JsonNode layoutDefinition
     ) {
-        validateJson(
+        validateJsonInternal(
                 result,
-                layoutDefinition,
-                true
+                layoutDefinition
         );
     }
 
-    private static void validateJson(
-            JsonNode result,
-            JsonNode layoutDefinition,
-            boolean validateCrop
+    private static void validateJsonInternal(
+            CardGenerationResult result,
+            JsonNode layoutDefinition
     ) {
-        if (result == null || result.isNull()) {
+        if (result == null) {
             throw new IllegalArgumentException(
                     "카드 구성 결과가 없습니다."
             );
         }
 
-        JsonNode cover =
-                result.path("cover");
-
-        JsonNode content =
-                result.path("content");
-
-        JsonNode closing =
-                result.path("closing");
-
-        if (!cover.isObject()) {
+        if (result.cover() == null) {
             throw new IllegalArgumentException(
                     "표지 카드가 없습니다."
             );
         }
 
-        if (!content.isArray() ||
-                content.isEmpty()) {
+        if (result.content() == null ||
+                result.content().isEmpty()) {
 
             throw new IllegalArgumentException(
                     "본문 카드가 없습니다."
             );
         }
 
-        if (!closing.isObject()) {
+        if (result.closing() == null) {
             throw new IllegalArgumentException(
                     "마무리 카드가 없습니다."
+            );
+        }
+
+        if (layoutDefinition == null ||
+                layoutDefinition.isNull()) {
+
+            throw new IllegalArgumentException(
+                    "템플릿 레이아웃이 없습니다."
             );
         }
 
@@ -131,8 +121,7 @@ public class CardGenerationValidator {
 
         validateText(
                 "cover.title",
-                cover.path("title")
-                        .asText(null),
+                result.cover().title(),
                 getMaxChars(
                         coverElements,
                         "title"
@@ -141,20 +130,12 @@ public class CardGenerationValidator {
 
         validateText(
                 "cover.highlight",
-                cover.path("highlight")
-                        .asText(null),
+                result.cover().highlight(),
                 getMaxChars(
                         coverElements,
                         "highlight"
                 )
         );
-
-        if (validateCrop) {
-            validateCropArea(
-                    "cover.cropArea",
-                    cover.path("cropArea")
-            );
-        }
 
         int titleMax =
                 getMaxChars(
@@ -175,48 +156,37 @@ public class CardGenerationValidator {
                 );
 
         for (int i = 0;
-             i < content.size();
+             i < result.content().size();
              i++) {
 
-            JsonNode card =
-                    content.get(i);
+            CardGenerationResult.ContentCard card =
+                    result.content().get(i);
 
             String prefix =
                     "content[" + i + "]";
 
             validateText(
                     prefix + ".title",
-                    card.path("title")
-                            .asText(null),
+                    card.title(),
                     titleMax
             );
 
             validateText(
                     prefix + ".body",
-                    card.path("body")
-                            .asText(null),
+                    card.body(),
                     bodyMax
             );
 
             validateText(
                     prefix + ".highlight",
-                    card.path("highlight")
-                            .asText(null),
+                    card.highlight(),
                     highlightMax
             );
-
-            if (validateCrop) {
-                validateCropArea(
-                        prefix + ".cropArea",
-                        card.path("cropArea")
-                );
-            }
         }
 
         validateText(
                 "closing.cta",
-                closing.path("cta")
-                        .asText(null),
+                result.closing().cta(),
                 20
         );
     }
@@ -230,11 +200,7 @@ public class CardGenerationValidator {
                         .path("maxChars");
 
         if (!maxChars.isInt()) {
-            throw new IllegalArgumentException(
-                    "템플릿의 "
-                            + elementName
-                            + " maxChars가 정의되지 않았습니다."
-            );
+            return DEFAULT_MAX_CHARS;
         }
 
         return maxChars.asInt();
@@ -268,45 +234,6 @@ public class CardGenerationValidator {
                             + length
                             + ", 최대="
                             + maxChars
-            );
-        }
-    }
-
-    private static void validateCropArea(
-            String fieldName,
-            JsonNode cropArea
-    ) {
-        if (!cropArea.isObject()) {
-            throw new IllegalArgumentException(
-                    fieldName
-                            + "가 없습니다."
-            );
-        }
-
-        double x =
-                cropArea.path("x")
-                        .asDouble(-1);
-
-        double y =
-                cropArea.path("y")
-                        .asDouble(-1);
-
-        double width =
-                cropArea.path("width")
-                        .asDouble(-1);
-
-        double height =
-                cropArea.path("height")
-                        .asDouble(-1);
-
-        if (x < 0 ||
-                y < 0 ||
-                width <= 0 ||
-                height <= 0) {
-
-            throw new IllegalArgumentException(
-                    fieldName
-                            + "의 값이 올바르지 않습니다."
             );
         }
     }

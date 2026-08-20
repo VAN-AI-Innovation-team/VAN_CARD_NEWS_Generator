@@ -45,12 +45,15 @@ services:
       SERVER_ERROR_INCLUDE_BINDING_ERRORS: always
       APP_UPLOAD_DIR: /app/uploads
       APP_UPLOAD_PUBLIC_BASE_URL: http://localhost:8080/uploads
+      APP_GENERATED_DIR: /app/generated
+      APP_GENERATED_PUBLIC_BASE_URL: http://localhost:8080/generated
 
     secrets:
       - source: db_password
         target: db_password
     volumes:
       - uploads_data:/app/uploads
+      - generated_data:/app/generated
     ports:
       - "8080:8080"
     networks:
@@ -64,6 +67,7 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  generated_data:
 
 networks:
   backend_network:

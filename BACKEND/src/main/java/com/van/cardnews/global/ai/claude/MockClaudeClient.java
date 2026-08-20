@@ -32,12 +32,15 @@ public class MockClaudeClient implements ClaudeClient {
                         ? images.get(1).imageId()
                         : firstImageId;
 
+        CardGenerationResult.CropArea defaultCropArea =
+                new CardGenerationResult.CropArea(0.0, 0.0, 100.0, 100.0);
+
         return new CardGenerationResult(
                 new CardGenerationResult.CoverContent(
                         request.title(),
                         "모집 안내",
                         firstImageId,
-                        null
+                        defaultCropArea
                 ),
                 List.of(
                         new CardGenerationResult.ContentCard(
@@ -45,7 +48,7 @@ public class MockClaudeClient implements ClaudeClient {
                                 request.body(),
                                 "지금 확인하세요",
                                 secondImageId,
-                                null
+                                defaultCropArea
                         )
                 ),
                 new CardGenerationResult.ClosingContent(

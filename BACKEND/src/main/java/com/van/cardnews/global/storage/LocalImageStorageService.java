@@ -30,22 +30,36 @@ public class LocalImageStorageService implements ImageStorageService {
     private static final long MAX_FILE_SIZE_BYTES =
             10L * 1024 * 1024;
 
-    @Value("${app.upload.dir}")
-    private String uploadDir;
+    private final Path uploadPath;
+    private final String uploadPublicBaseUrl;
 
-    @Value("${app.upload.public-base-url}")
-    private String publicBaseUrl;
+    private final Path generatedPath;
+    private final String generatedPublicBaseUrl;
+
+    public LocalImageStorageService(
+            @Value("${app.upload.dir}") String uploadDir,
+            @Value("${app.upload.public-base-url}") String uploadPublicBaseUrl,
+            @Value("${app.generated.dir}") String generatedDir,
+            @Value("${app.generated.public-base-url}") String generatedPublicBaseUrl
+    ) {
+        this.uploadPath = Paths.get(uploadDir);
+        this.uploadPublicBaseUrl = uploadPublicBaseUrl;
+        this.generatedPath = Paths.get(generatedDir);
+        this.generatedPublicBaseUrl = generatedPublicBaseUrl;
+
+        try {
+            Files.createDirectories(this.uploadPath);
+            Files.createDirectories(this.generatedPath);
+        } catch (IOException e) {
+            throw new IllegalStateException("이미지 저장 디렉토리를 생성할 수 없습니다.", e);
+        }
+    }
 
     @Override
     public String store(MultipartFile file) {
         validate(file);
 
         try {
-            Path targetDir =
-                    Paths.get(uploadDir);
-
-            Files.createDirectories(targetDir);
-
             String extension =
                     extractExtension(
                             file.getOriginalFilename()
@@ -55,7 +69,7 @@ public class LocalImageStorageService implements ImageStorageService {
                     UUID.randomUUID() + extension;
 
             Path targetPath =
-                    targetDir.resolve(storedFileName);
+                    uploadPath.resolve(storedFileName);
 
             Files.copy(
                     file.getInputStream(),
@@ -63,7 +77,7 @@ public class LocalImageStorageService implements ImageStorageService {
                     StandardCopyOption.REPLACE_EXISTING
             );
 
-            return publicBaseUrl + "/" + storedFileName;
+            return uploadPublicBaseUrl + "/" + storedFileName;
 
         } catch (IOException e) {
             log.error(
@@ -131,6 +145,19 @@ public class LocalImageStorageService implements ImageStorageService {
         }
     }
 
+    @Override
+    public StoredImage save(byte[] imageBytes, String fileName) {
+        try {
+            Path targetPath = generatedPath.resolve(fileName);
+            Files.write(targetPath, imageBytes);
+            String publicUrl = generatedPublicBaseUrl + "/" + fileName;
+            return new StoredImage(publicUrl, targetPath.toString());
+        } catch (IOException e) {
+            log.error("생성된 이미지 저장 실패: {}", fileName, e);
+            throw new IllegalStateException("이미지 저장에 실패했습니다: " + fileName, e);
+        }
+    }
+
     private Path resolveStoredPath(String imageUrl) {
         String fileName =
                 imageUrl.substring(
@@ -147,7 +174,7 @@ public class LocalImageStorageService implements ImageStorageService {
             );
         }
 
-        return Paths.get(uploadDir)
+        return uploadPath
                 .resolve(fileName)
                 .normalize();
     }

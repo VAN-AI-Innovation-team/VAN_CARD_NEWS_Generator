@@ -11,6 +11,7 @@ import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentImage;
 import com.van.cardnews.domain.content.repository.ContentRepository;
+import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import com.van.cardnews.domain.generation.service.CardGenerationValidator;
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
 import com.van.cardnews.domain.jobhistory.entity.JobType;
@@ -141,8 +142,15 @@ public class ContentService {
             );
         }
 
+        // JsonNode 형태의 결과를 CardGenerationResult 객체로 변환하여 검증에 전달
+        CardGenerationResult resultObj =
+                objectMapper.convertValue(
+                        request.cardGenerationResult(),
+                        CardGenerationResult.class
+                );
+
         CardGenerationValidator.validateJson(
-                request.cardGenerationResult(),
+                resultObj,
                 content.getTemplate().getLayoutDefinition()
         );
 
