@@ -4,7 +4,7 @@ import axios from 'axios';
 import { TemplateProvider, useTemplate } from './contexts/TemplateContext';
 
 import { TemplateSelector } from './components/TemplateSelector/TemplateSelector';
-
+import CardNewsEditor from './components/CardNewsPreview/CardNewsEditor';
 import PostInputForm, {
   type PostInputFormSubmitPayload,
 } from './components/PostForm/PostInputForm';
@@ -13,11 +13,18 @@ import ContentTypeSelector from './components/ContentTypeSelector/ContentTypeSel
 
 import type { ContentType } from './types/content';
 
-import { createContent } from './api/contentApi';
+import {
+  createContent,
+  fetchContentPreview,
+  type ContentPreviewResponse,
+} from './api/contentApi';
 
 import './App.css';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
+
+const PREVIEW_POLL_INTERVAL = 1000;
+const PREVIEW_POLL_MAX_COUNT = 30;
 
 function App() {
   return (
@@ -41,20 +48,18 @@ function AppContent() {
 
   const [isCreating, setIsCreating] = useState(false);
 
+  const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
+
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
   const { selectedTemplateId, clearSelectedTemplate } = useTemplate();
 
-  /**
-   * STEP 02 콘텐츠 작성 완료 여부
-   */
   const isPostDataValid =
     postData !== null &&
     postData.title.trim().length > 0 &&
     postData.body.trim().length > 0 &&
     postData.images.length > 0;
 
-  /**
-   * 백엔드 연결 상태 확인
-   */
   async function checkBackendConnection() {
     try {
       const response = await axios.get('/api/health');
@@ -62,21 +67,14 @@ function AppContent() {
       setMessage(response.data.message);
     } catch (error) {
       console.error('백엔드 통신 오류:', error);
-
       setMessage('백엔드 연결 실패');
     }
   }
 
-  /**
-   * 앱 최초 실행
-   */
   useEffect(() => {
-    checkBackendConnection();
+    void checkBackendConnection();
   }, []);
 
-  /**
-   * 콘텐츠 유형 → STEP 02
-   */
   function handleNextFromContentType() {
     if (!selectedContentType) {
       return;
@@ -85,9 +83,6 @@ function AppContent() {
     setStep(2);
   }
 
-  /**
-   * STEP 02 → STEP 03
-   */
   function handleNextFromContent() {
     if (!isPostDataValid) {
       return;
@@ -96,42 +91,56 @@ function AppContent() {
     setStep(3);
   }
 
-  /**
-   * STEP 03 → 실제 카드뉴스 생성 요청
-   */
-  async function handleCreateContent() {
-    if (!isPostDataValid) {
-      return;
+  async function waitForPreview(contentId: number) {
+    for (let attempt = 0; attempt < PREVIEW_POLL_MAX_COUNT; attempt += 1) {
+      const result = await fetchContentPreview(contentId);
+
+      if (result.cardGenerationResult !== null) {
+        return result;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, PREVIEW_POLL_INTERVAL),
+      );
     }
 
-    if (!selectedTemplateId) {
+    throw new Error('카드 구성 결과 생성 시간이 초과되었습니다.');
+  }
+
+  async function handleCreateContent() {
+    if (!isPostDataValid || !selectedTemplateId) {
       return;
     }
 
     try {
       setIsCreating(true);
+      setPreviewError(null);
+      setPreview(null);
 
-      await createContent({
+      const response = await createContent({
         title: postData.title,
         body: postData.body,
         images: postData.images,
         templateId: selectedTemplateId,
       });
 
-      /*
-       * 현재는 미리보기 화면을 만들지 않으므로
-       * 성공 후에도 STEP 03에 그대로 유지합니다.
-       */
+      const previewData = await waitForPreview(response.contentId);
+
+      setPreview(previewData);
+      setStep(4);
     } catch (error) {
-      console.error('카드뉴스 생성 요청 실패:', error);
+      console.error('카드뉴스 생성/미리보기 실패:', error);
+
+      setPreviewError(
+        error instanceof Error
+          ? error.message
+          : '카드뉴스 생성 중 오류가 발생했습니다.',
+      );
     } finally {
       setIsCreating(false);
     }
   }
 
-  /**
-   * 이전 단계로 이동
-   */
   function handlePreviousStep() {
     if (step === 2) {
       setStep(1);
@@ -140,27 +149,25 @@ function AppContent() {
 
     if (step === 3) {
       setStep(2);
+      return;
+    }
+
+    if (step === 4) {
+      setStep(3);
     }
   }
 
-  /**
-   * 새 카드뉴스 제작 시작
-   */
   function handleStartNewContent() {
     setStep(1);
-
     setSelectedContentType(null);
-
     setPostData(null);
-
+    setPreview(null);
+    setPreviewError(null);
     clearSelectedTemplate();
   }
 
   return (
     <div className="app">
-      {/* ================================
-          HEADER
-      ================================= */}
       <header className="app-header">
         <div className="app-header__inner">
           <div className="app-brand">
@@ -202,9 +209,6 @@ function AppContent() {
       </header>
 
       <main className="app-main">
-        {/* ================================
-            PAGE INTRO
-        ================================= */}
         <section className="page-intro">
           <p className="page-intro__eyebrow">CARD NEWS GENERATOR</p>
 
@@ -216,11 +220,7 @@ function AppContent() {
           </p>
         </section>
 
-        {/* ================================
-            STEP NAVIGATION
-        ================================= */}
         <nav className="step-navigation" aria-label="카드뉴스 제작 단계">
-          {/* STEP 01 */}
           <div
             className={`step-item ${step >= 1 ? 'step-item--active' : ''} ${
               step > 1 ? 'step-item--completed' : ''
@@ -237,7 +237,6 @@ function AppContent() {
 
           <span className="step-navigation__line" />
 
-          {/* STEP 02 */}
           <div
             className={`step-item ${step >= 2 ? 'step-item--active' : ''} ${
               step > 2 ? 'step-item--completed' : ''
@@ -256,8 +255,11 @@ function AppContent() {
 
           <span className="step-navigation__line" />
 
-          {/* STEP 03 */}
-          <div className={`step-item ${step >= 3 ? 'step-item--active' : ''}`}>
+          <div
+            className={`step-item ${step >= 3 ? 'step-item--active' : ''} ${
+              step > 3 ? 'step-item--completed' : ''
+            }`}
+          >
             <span className="step-item__number">03</span>
 
             <div className="step-item__content">
@@ -266,13 +268,21 @@ function AppContent() {
               <span className="step-item__description">추천 템플릿 확인</span>
             </div>
           </div>
+
+          <span className="step-navigation__line" />
+
+          <div className={`step-item ${step >= 4 ? 'step-item--active' : ''}`}>
+            <span className="step-item__number">04</span>
+
+            <div className="step-item__content">
+              <span className="step-item__label">미리보기</span>
+
+              <span className="step-item__description">생성 결과 확인</span>
+            </div>
+          </div>
         </nav>
 
-        {/* ================================
-            WORKFLOW
-        ================================= */}
         <section className="workflow-panel">
-          {/* STEP 01 */}
           {step === 1 && (
             <div className="workflow-step">
               <div className="workflow-step__header">
@@ -309,7 +319,6 @@ function AppContent() {
             </div>
           )}
 
-          {/* STEP 02 */}
           {step === 2 && (
             <div className="workflow-step">
               <div className="workflow-step__header">
@@ -350,7 +359,6 @@ function AppContent() {
             </div>
           )}
 
-          {/* STEP 03 */}
           {step === 3 && (
             <div className="workflow-step">
               <div className="workflow-step__header">
@@ -367,6 +375,8 @@ function AppContent() {
               </div>
 
               <TemplateSelector contentType={selectedContentType} />
+
+              {previewError && <p className="preview-error">{previewError}</p>}
 
               <div className="workflow-navigation">
                 <button
@@ -387,7 +397,44 @@ function AppContent() {
                   }
                   onClick={handleCreateContent}
                 >
-                  {isCreating ? '생성 요청 중...' : '카드뉴스 만들기'}
+                  {isCreating ? '카드뉴스 생성 중...' : '카드뉴스 만들기'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && preview && preview.cardGenerationResult && (
+            <div className="workflow-step">
+              <div className="workflow-step__header">
+                <p className="workflow-step__eyebrow">STEP 04 · PREVIEW</p>
+
+                <h3 className="workflow-step__title">
+                  생성된 카드뉴스를 확인해주세요.
+                </h3>
+
+                <p className="workflow-step__description">
+                  카드별 문구를 확인하고 필요한 내용을 수정할 수 있습니다.
+                </p>
+              </div>
+
+              <CardNewsEditor preview={preview} onUpdated={setPreview} />
+
+              <div className="workflow-navigation">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handlePreviousStep}
+                >
+                  <span aria-hidden="true">←</span>
+                  템플릿 수정
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleStartNewContent}
+                >
+                  새 카드뉴스 만들기
                 </button>
               </div>
             </div>
@@ -397,7 +444,6 @@ function AppContent() {
 
       <footer className="app-footer">
         <span>VAN Card News Generator</span>
-
         <span>AI 콘텐츠 자동 제작 시스템</span>
       </footer>
     </div>

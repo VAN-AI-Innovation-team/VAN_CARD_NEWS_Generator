@@ -20,7 +20,6 @@ const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 export function TemplateSelector({ contentType }: TemplateSelectorProps) {
   const {
     templates,
-    recommendedTemplateId,
     selectedTemplateId,
     setSelectedTemplateId,
     reloadTemplates,
@@ -29,39 +28,34 @@ export function TemplateSelector({ contentType }: TemplateSelectorProps) {
   } = useTemplate();
 
   /**
-   * 콘텐츠 유형이 변경되면
-   * 해당 유형의 활성 템플릿을 다시 조회합니다.
+   * 컴포넌트 마운트 시 전체 활성 템플릿을 조회합니다.
    */
   useEffect(() => {
-    if (!contentType) {
-      return;
-    }
-
-    void reloadTemplates(contentType);
-  }, [contentType, reloadTemplates]);
+    void reloadTemplates();
+  }, [reloadTemplates]);
 
   /**
-   * API에서 받은 추천 템플릿을 맨 앞으로 배치합니다.
-   *
-   * 어떤 코드가 추천되는지는 프론트에서 판단하지 않습니다.
+   * 정렬 로직:
+   * 현재 선택된 콘텐츠 유형(contentType)과 일치하는 템플릿들을 1순위(최상단)로 정렬하고,
+   * 그 외의 템플릿들을 2순위로 아래에 배치합니다.
    */
   const sortedTemplates = useMemo(() => {
-    if (recommendedTemplateId === null) {
-      return templates;
-    }
-
     return [...templates].sort((a, b) => {
-      if (a.id === recommendedTemplateId) {
+      const aMatchesType = contentType ? a.contentType === contentType : false;
+      const bMatchesType = contentType ? b.contentType === contentType : false;
+
+      // 선택한 콘텐츠 유형과 일치하는 템플릿을 최상단으로 정렬 (-1)
+      if (aMatchesType && !bMatchesType) {
         return -1;
       }
-
-      if (b.id === recommendedTemplateId) {
+      if (!aMatchesType && bMatchesType) {
         return 1;
       }
 
+      // 둘 다 일치하거나 둘 다 아니면 기존 순서 유지
       return 0;
     });
-  }, [templates, recommendedTemplateId]);
+  }, [templates, contentType]);
 
   return (
     <section className="tpl-selector" aria-label="카드뉴스 템플릿 선택">
@@ -102,9 +96,14 @@ export function TemplateSelector({ contentType }: TemplateSelectorProps) {
           {sortedTemplates.map((template) => {
             const isSelected = template.id === selectedTemplateId;
 
-            const isRecommended = template.id === recommendedTemplateId;
+            // 선택한 콘텐츠 유형과 일치하는 모든 템플릿을 '추천'으로 처리
+            const isRecommended = contentType
+              ? template.contentType === contentType
+              : false;
 
-            const contentTypeLabel = CONTENT_TYPE_LABELS[contentType ?? 'news'];
+            const templateContentTypeLabel =
+              CONTENT_TYPE_LABELS[template.contentType as ContentType] ??
+              '소식';
 
             return (
               <button
@@ -118,7 +117,9 @@ export function TemplateSelector({ contentType }: TemplateSelectorProps) {
                 onClick={() => setSelectedTemplateId(template.id)}
               >
                 <span className="tpl-card__top">
-                  <span className="tpl-card__tag">{contentTypeLabel}</span>
+                  <span className="tpl-card__tag">
+                    {templateContentTypeLabel}
+                  </span>
 
                   {isRecommended && (
                     <span className="tpl-card__recommend">추천</span>
@@ -159,7 +160,7 @@ export function TemplateSelector({ contentType }: TemplateSelectorProps) {
           </p>
 
           <p className="tpl-selector__empty-description">
-            선택한 콘텐츠 유형에 등록된 활성 템플릿이 없습니다.
+            등록된 활성 템플릿이 없습니다.
           </p>
         </div>
       )}

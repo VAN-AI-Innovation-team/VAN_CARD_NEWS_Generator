@@ -14,16 +14,19 @@ import type { Template } from '../types/template';
 
 interface TemplateContextValue {
   /**
-   * 현재 콘텐츠 유형에 대해 조회된 템플릿
+   * 현재 조회된 전체 템플릿
    */
   templates: Template[];
 
   /**
-   * 현재 추천 템플릿 ID
-   *
-   * API가 추천하지 않는 경우 null
+   * 현재 추천 템플릿 ID (단일 값)
    */
   recommendedTemplateId: number | null;
+
+  /**
+   * 정렬 및 복수 추천 처리를 위한 추천 템플릿 ID 목록 (배열)
+   */
+  recommendedTemplateIds: number[];
 
   /**
    * 현재 선택된 템플릿 ID
@@ -51,9 +54,9 @@ interface TemplateContextValue {
   error: string | null;
 
   /**
-   * 콘텐츠 유형 기준으로 템플릿 조회
+   * 템플릿 조회 (contentType은 선택 사항으로 변경하여 전체 조회 지원)
    */
-  reloadTemplates: (contentType: ContentType) => Promise<void>;
+  reloadTemplates: (contentType?: ContentType | string) => Promise<void>;
 
   /**
    * 템플릿 선택
@@ -91,70 +94,64 @@ export function TemplateProvider({ children }: TemplateProviderProps) {
 
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * 콘텐츠 유형에 맞는 활성 템플릿 조회
-   */
-  const reloadTemplates = useCallback(async (contentType: ContentType) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetchTemplates({
-        contentType,
-        active: true,
-      });
-
-      setTemplatesState(response.templates);
-
-      setRecommendedTemplateId(response.recommendedTemplateId);
-
-      /**
-       * 이전에 선택한 템플릿이
-       * 새로 조회한 목록에 없다면 초기화합니다.
-       */
-      setSelectedTemplateIdState((currentSelectedId) => {
-        if (currentSelectedId === null) {
-          return null;
-        }
-
-        const exists = response.templates.some(
-          (template) => template.id === currentSelectedId,
-        );
-
-        return exists ? currentSelectedId : null;
-      });
-    } catch (requestError) {
-      console.error('템플릿 목록 조회 실패:', requestError);
-
-      setTemplatesState([]);
-      setRecommendedTemplateId(null);
-      setSelectedTemplateIdState(null);
-
-      setError('템플릿 정보를 불러오지 못했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const recommendedTemplateIds = useMemo(() => {
+    return recommendedTemplateId != null ? [recommendedTemplateId] : [];
+  }, [recommendedTemplateId]);
 
   /**
-   * 템플릿 선택
+   * 전체 활성 템플릿 조회 (contentType이 안 들어와도 전체를 조회하도록 처리)
    */
+  const reloadTemplates = useCallback(
+    async (contentType?: ContentType | string) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // 인자로 전달된 값이 있다면 사용하고, 없다면 undefined 전달하여 전체 조회
+        const response = await fetchTemplates({
+          contentType: contentType as ContentType,
+          active: true,
+        });
+
+        setTemplatesState(response.templates);
+        setRecommendedTemplateId(response.recommendedTemplateId);
+
+        setSelectedTemplateIdState((currentSelectedId) => {
+          if (currentSelectedId === null) {
+            return null;
+          }
+
+          const exists = response.templates.some(
+            (template) => template.id === currentSelectedId,
+          );
+
+          return exists ? currentSelectedId : null;
+        });
+      } catch (requestError) {
+        console.error('템플릿 목록 조회 실패:', requestError);
+
+        setTemplatesState([]);
+        setRecommendedTemplateId(null);
+        setSelectedTemplateIdState(null);
+
+        setError('템플릿 정보를 불러오지 못했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
   const setSelectedTemplateId = useCallback((templateId: number) => {
     setSelectedTemplateIdState(templateId);
     setLastChangedAt(Date.now());
   }, []);
 
-  /**
-   * 선택 초기화
-   */
   const clearSelectedTemplate = useCallback(() => {
     setSelectedTemplateIdState(null);
     setLastChangedAt(Date.now());
   }, []);
 
-  /**
-   * 선택된 템플릿 계산
-   */
   const selectedTemplate = useMemo<Template | null>(
     () =>
       templates.find((template) => template.id === selectedTemplateId) ?? null,
@@ -164,28 +161,21 @@ export function TemplateProvider({ children }: TemplateProviderProps) {
   const value = useMemo<TemplateContextValue>(
     () => ({
       templates,
-
       recommendedTemplateId,
-
+      recommendedTemplateIds,
       selectedTemplateId,
-
       selectedTemplate,
-
       lastChangedAt,
-
       isLoading,
-
       error,
-
       reloadTemplates,
-
       setSelectedTemplateId,
-
       clearSelectedTemplate,
     }),
     [
       templates,
       recommendedTemplateId,
+      recommendedTemplateIds,
       selectedTemplateId,
       selectedTemplate,
       lastChangedAt,
@@ -204,9 +194,6 @@ export function TemplateProvider({ children }: TemplateProviderProps) {
   );
 }
 
-/**
- * TemplateContext 사용 Hook
- */
 export function useTemplate(): TemplateContextValue {
   const context = useContext(TemplateContext);
 
@@ -218,3 +205,5 @@ export function useTemplate(): TemplateContextValue {
 
   return context;
 }
+
+export default TemplateContext;
