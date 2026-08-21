@@ -88,14 +88,7 @@ public class CardGenerationService {
 
         /*
          * 중요:
-         *
-         * 과거에는 여기에서 ImageCropService를 이용해서
-         * cropArea를 계산했습니다.
-         *
-         * 이제 이미지 생성/구도/crop은 Higgsfield가 담당하므로
-         * Backend에서 cropArea를 계산하지 않습니다.
-         *
-         * 따라서 Claude 결과를 그대로 저장합니다.
+         * Claude 결과를 그대로 저장합니다.
          */
         content.updateCardGenerationResult(
                 objectMapper.valueToTree(result)

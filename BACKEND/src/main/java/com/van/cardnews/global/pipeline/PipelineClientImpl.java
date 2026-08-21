@@ -99,9 +99,7 @@ public class PipelineClientImpl implements PipelineClient {
                     result.content().size()
             );
 
-            jobHistory.markCompleted(
-                    "카드 구성 완료 (본문 카드 " + result.content().size() + "장)"
-            );
+            jobHistory.markCompleted(null);
 
         } catch (Exception e) {
             log.error(

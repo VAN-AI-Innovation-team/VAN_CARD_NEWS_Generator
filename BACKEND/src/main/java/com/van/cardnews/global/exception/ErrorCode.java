@@ -39,6 +39,11 @@ public enum ErrorCode {
             "요청한 콘텐츠를 찾을 수 없습니다."
     ),
 
+    JOB_HISTORY_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "요청한 작업 이력을 찾을 수 없습니다."
+    ),
+
     PIPELINE_TRIGGER_FAILED(
             HttpStatus.BAD_GATEWAY,
             "생성 파이프라인 호출에 실패했습니다."
