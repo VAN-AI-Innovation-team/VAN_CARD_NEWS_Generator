@@ -8,6 +8,8 @@ import CardNewsEditor from './components/CardNewsPreview/CardNewsEditor';
 import PostInputForm, {
   type PostInputFormSubmitPayload,
 } from './components/PostForm/PostInputForm';
+import GenerationLoading from './components/GenerationState/GenerationLoading';
+import GenerationError from './components/GenerationState/GenerationError';
 
 import ContentTypeSelector from './components/ContentTypeSelector/ContentTypeSelector';
 
@@ -104,7 +106,9 @@ function AppContent() {
       );
     }
 
-    throw new Error('카드 구성 결과 생성 시간이 초과되었습니다.');
+    throw new Error(
+      '카드 구성 결과 생성 시간이 초과되었습니다. 다시 시도해주세요.',
+    );
   }
 
   async function handleCreateContent() {
@@ -155,6 +159,11 @@ function AppContent() {
     if (step === 4) {
       setStep(3);
     }
+  }
+
+  function handleEditTemplate() {
+    setPreviewError(null);
+    setStep(1);
   }
 
   function handleStartNewContent() {
@@ -361,45 +370,53 @@ function AppContent() {
 
           {step === 3 && (
             <div className="workflow-step">
-              <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">STEP 03 · TEMPLATE</p>
+              {isCreating ? (
+                <GenerationLoading />
+              ) : previewError ? (
+                <GenerationError
+                  message={previewError}
+                  onRetry={() => void handleCreateContent()}
+                  onEditTemplate={() => void handleEditTemplate()}
+                  retryDisabled={!isPostDataValid || !selectedTemplateId}
+                />
+              ) : (
+                <>
+                  <div className="workflow-step__header">
+                    <p className="workflow-step__eyebrow">STEP 03 · TEMPLATE</p>
 
-                <h3 className="workflow-step__title">
-                  추천 템플릿을 선택해주세요.
-                </h3>
+                    <h3 className="workflow-step__title">
+                      추천 템플릿을 선택해주세요.
+                    </h3>
 
-                <p className="workflow-step__description">
-                  선택한 콘텐츠 유형에 적합한 템플릿을 확인하고 카드뉴스 제작에
-                  사용할 디자인을 선택합니다.
-                </p>
-              </div>
+                    <p className="workflow-step__description">
+                      선택한 콘텐츠 유형에 적합한 템플릿을 확인하고 카드뉴스
+                      제작에 사용할 디자인을 선택합니다.
+                    </p>
+                  </div>
 
-              <TemplateSelector contentType={selectedContentType} />
+                  <TemplateSelector contentType={selectedContentType} />
 
-              {previewError && <p className="preview-error">{previewError}</p>}
+                  <div className="workflow-navigation">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handlePreviousStep}
+                    >
+                      <span aria-hidden="true">←</span>
+                      이전
+                    </button>
 
-              <div className="workflow-navigation">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={isCreating}
-                  onClick={handlePreviousStep}
-                >
-                  <span aria-hidden="true">←</span>
-                  이전
-                </button>
-
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={
-                    !isPostDataValid || !selectedTemplateId || isCreating
-                  }
-                  onClick={handleCreateContent}
-                >
-                  {isCreating ? '카드뉴스 생성 중...' : '카드뉴스 만들기'}
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={!isPostDataValid || !selectedTemplateId}
+                      onClick={handleCreateContent}
+                    >
+                      카드뉴스 만들기
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
