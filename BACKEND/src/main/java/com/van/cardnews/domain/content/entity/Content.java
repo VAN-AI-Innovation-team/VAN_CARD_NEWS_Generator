@@ -93,12 +93,12 @@ public class Content {
         image.assignContent(this);
     }
 
-    // 💡 1번 필드 업데이트 메서드
+    // 1번 필드 업데이트 메서드
     public void updateCardGenerationResult(JsonNode cardGenerationResult) {
         this.cardGenerationResult = cardGenerationResult;
     }
 
-    // 💡 2번 필드 업데이트 메서드
+    // 2번 필드 업데이트 메서드
     public void updateCardImagePlacements(JsonNode cardImagePlacements) {
         this.cardImagePlacements = cardImagePlacements;
     }

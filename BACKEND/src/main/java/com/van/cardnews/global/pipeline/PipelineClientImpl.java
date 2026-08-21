@@ -26,7 +26,7 @@ public class PipelineClientImpl implements PipelineClient {
 
     /**
      * Content와 JobHistory 저장 트랜잭션이 COMMIT된 이후
-     * 새로운 트랜잭션으로 생성 파이프라인을 실행합니다.
+     * 새로운 트랜잭션으로 카피 생성 파이프라인을 실행합니다.
      */
     @Async
     @TransactionalEventListener(
@@ -43,7 +43,11 @@ public class PipelineClientImpl implements PipelineClient {
     }
 
     /**
-     * 실제 카드뉴스 생성 파이프라인입니다.
+     * 카드 구성(카피) 생성 파이프라인입니다. (JobType.COPY_GENERATION 전용)
+     *
+     * 이미지 생성(JobType.IMAGE_GENERATION)은 이 파이프라인의 범위가 아니며,
+     * 프론트엔드의 별도 요청으로 CardImageGenerationService가 독립적으로 처리합니다.
+     * 즉 하나의 트리거 = 하나의 JobHistory 원칙을 지킵니다.
      *
      * handleGenerationRequested()에서 이미
      * REQUIRES_NEW 트랜잭션이 열린 상태이므로
@@ -56,7 +60,7 @@ public class PipelineClientImpl implements PipelineClient {
             Long jobHistoryId
     ) {
         log.info(
-                "[Pipeline] 생성 파이프라인 시작 - contentId={}, jobHistoryId={}",
+                "[Pipeline] 카피 생성 파이프라인 시작 - contentId={}, jobHistoryId={}",
                 contentId,
                 jobHistoryId
         );
@@ -95,16 +99,13 @@ public class PipelineClientImpl implements PipelineClient {
                     result.content().size()
             );
 
-            /*
-             * 현재 #8에서는 카드 구성 결과 생성까지 수행합니다.
-             *
-             * 실제 이미지 파일 생성 및 JobHistory.COMPLETED 처리는
-             * #9 이후 단계에서 연결합니다.
-             */
+            jobHistory.markCompleted(
+                    "카드 구성 완료 (본문 카드 " + result.content().size() + "장)"
+            );
 
         } catch (Exception e) {
             log.error(
-                    "[Pipeline] 생성 파이프라인 실패 - contentId={}, jobHistoryId={}",
+                    "[Pipeline] 카피 생성 파이프라인 실패 - contentId={}, jobHistoryId={}",
                     contentId,
                     jobHistoryId,
                     e
@@ -113,7 +114,7 @@ public class PipelineClientImpl implements PipelineClient {
             jobHistory.markFailed(
                     e.getMessage() != null
                             ? e.getMessage()
-                            : "카드뉴스 생성 중 오류가 발생했습니다."
+                            : "카드뉴스 카피 생성 중 오류가 발생했습니다."
             );
         }
     }
