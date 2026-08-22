@@ -41,6 +41,18 @@ function PostInputForm({
   const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // 필드별 "사용자가 한 번이라도 상호작용했는지" 여부.
+  // 값이 true가 되기 전까지는 필수 입력 에러를 보여주지 않아,
+  // 폼 진입 직후부터 에러가 한꺼번에 노출되는 것을 방지합니다.
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [bodyTouched, setBodyTouched] = useState(false);
+  const [imagesTouched, setImagesTouched] = useState(false);
+
+  // 사용자가 글자수 제한을 "초과해서 입력을 시도한 바로 그 순간"에만 true가 됩니다.
+  // (제한까지 정상적으로 채운 것과, 제한을 넘겨서 입력하려 한 것을 구분하기 위함)
+  const [titleLimitExceeded, setTitleLimitExceeded] = useState(false);
+  const [bodyLimitExceeded, setBodyLimitExceeded] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   /**
@@ -99,23 +111,60 @@ function PostInputForm({
     });
   }
 
+  // 필수 입력 검증 메시지 (trim 기준 — App.tsx의 isPostDataValid와 동일한 기준)
+  const titleRequiredError =
+    title.trim().length === 0 ? '제목을 입력해주세요.' : null;
+
+  const bodyRequiredError =
+    body.trim().length === 0 ? '본문을 입력해주세요.' : null;
+
+  const imagesRequiredError =
+    images.length === 0 ? '사진을 최소 1장 이상 등록해주세요.' : null;
+
+  const showTitleRequiredError = titleTouched && Boolean(titleRequiredError);
+  const showBodyRequiredError = bodyTouched && Boolean(bodyRequiredError);
+  const showImagesRequiredError = imagesTouched && Boolean(imagesRequiredError);
+
+  const isTitleAtLimit = title.length >= TITLE_MAX_LENGTH;
+  const isBodyAtLimit = body.length >= BODY_MAX_LENGTH;
+
   function handleTitleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const nextTitle = event.target.value.slice(0, TITLE_MAX_LENGTH);
+    const rawValue = event.target.value;
+    const nextTitle = rawValue.slice(0, TITLE_MAX_LENGTH);
+
+    // 실제로 제한을 넘겨 입력(타이핑/붙여넣기)하려 한 경우에만 에러를 켭니다.
+    // 지우거나 제한 이하로 입력 중이면 자동으로 꺼집니다.
+    setTitleLimitExceeded(rawValue.length > TITLE_MAX_LENGTH);
 
     setTitle(nextTitle);
+    setTitleTouched(true);
 
     notifyChange(nextTitle, body, images);
   }
 
   function handleBodyChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
-    const nextBody = event.target.value.slice(0, BODY_MAX_LENGTH);
+    const rawValue = event.target.value;
+    const nextBody = rawValue.slice(0, BODY_MAX_LENGTH);
+
+    setBodyLimitExceeded(rawValue.length > BODY_MAX_LENGTH);
 
     setBody(nextBody);
+    setBodyTouched(true);
 
     notifyChange(title, nextBody, images);
   }
 
+  function handleTitleBlur() {
+    setTitleTouched(true);
+  }
+
+  function handleBodyBlur() {
+    setBodyTouched(true);
+  }
+
   function addFiles(fileList: FileList) {
+    setImagesTouched(true);
+
     const incomingFiles = Array.from(fileList);
 
     const validFiles: File[] = [];
@@ -177,6 +226,7 @@ function PostInputForm({
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragging(false);
+    setImagesTouched(true);
 
     if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
       addFiles(event.dataTransfer.files);
@@ -192,7 +242,14 @@ function PostInputForm({
     setIsDragging(false);
   }
 
+  function handleDropzoneOpen() {
+    setImagesTouched(true);
+    fileInputRef.current?.click();
+  }
+
   function handleRemoveImage(id: string) {
+    setImagesTouched(true);
+
     setImages((previousImages) => {
       const target = previousImages.find((image) => image.id === id);
 
@@ -226,9 +283,16 @@ function PostInputForm({
           <label htmlFor="post-title" className={styles.fieldLabel}>
             <span className={styles.fieldIndex}>01</span>
             제목
+            <span className={styles.requiredMark} aria-hidden="true">
+              *
+            </span>
           </label>
 
-          <span className={styles.counter}>
+          <span
+            className={`${styles.counter} ${
+              isTitleAtLimit ? styles.counterAtLimit : ''
+            }`}
+          >
             {title.length} / {TITLE_MAX_LENGTH}
           </span>
         </div>
@@ -236,12 +300,27 @@ function PostInputForm({
         <input
           id="post-title"
           type="text"
-          className={styles.textInput}
+          className={`${styles.textInput} ${
+            showTitleRequiredError || titleLimitExceeded
+              ? styles.inputInvalid
+              : ''
+          }`}
           placeholder="예) 신입생을 위한 학회 활동 가이드"
           value={title}
           onChange={handleTitleChange}
+          onBlur={handleTitleBlur}
+          aria-invalid={showTitleRequiredError || titleLimitExceeded}
+          aria-describedby="post-title-error"
           required
         />
+
+        <p id="post-title-error" className={styles.fieldErrorText} role="alert">
+          {titleLimitExceeded
+            ? `최대 ${TITLE_MAX_LENGTH}자까지 입력할 수 있어요. 초과한 내용은 저장되지 않습니다.`
+            : showTitleRequiredError
+              ? titleRequiredError
+              : ''}
+        </p>
       </section>
 
       {/* 02. 본문 */}
@@ -250,22 +329,44 @@ function PostInputForm({
           <label htmlFor="post-body" className={styles.fieldLabel}>
             <span className={styles.fieldIndex}>02</span>
             본문
+            <span className={styles.requiredMark} aria-hidden="true">
+              *
+            </span>
           </label>
 
-          <span className={styles.counter}>
+          <span
+            className={`${styles.counter} ${
+              isBodyAtLimit ? styles.counterAtLimit : ''
+            }`}
+          >
             {body.length} / {BODY_MAX_LENGTH}
           </span>
         </div>
 
         <textarea
           id="post-body"
-          className={styles.textArea}
+          className={`${styles.textArea} ${
+            showBodyRequiredError || bodyLimitExceeded
+              ? styles.inputInvalid
+              : ''
+          }`}
           placeholder="카드뉴스에 들어갈 본문 내용을 입력하세요."
           value={body}
           onChange={handleBodyChange}
+          onBlur={handleBodyBlur}
           rows={6}
+          aria-invalid={showBodyRequiredError || bodyLimitExceeded}
+          aria-describedby="post-body-error"
           required
         />
+
+        <p id="post-body-error" className={styles.fieldErrorText} role="alert">
+          {bodyLimitExceeded
+            ? `최대 ${BODY_MAX_LENGTH}자까지 입력할 수 있어요. 초과한 내용은 저장되지 않습니다.`
+            : showBodyRequiredError
+              ? bodyRequiredError
+              : ''}
+        </p>
       </section>
 
       {/* 03. 사진 */}
@@ -274,6 +375,9 @@ function PostInputForm({
           <span className={styles.fieldLabel}>
             <span className={styles.fieldIndex}>03</span>
             사진
+            <span className={styles.requiredMark} aria-hidden="true">
+              *
+            </span>
           </span>
 
           <span className={styles.counter}>
@@ -284,16 +388,18 @@ function PostInputForm({
         <div
           className={`${styles.dropzone} ${
             isDragging ? styles.dropzoneActive : ''
-          }`}
+          } ${showImagesRequiredError ? styles.dropzoneInvalid : ''}`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleDropzoneOpen}
           role="button"
           tabIndex={0}
+          aria-invalid={showImagesRequiredError}
+          aria-describedby="post-images-error"
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
-              fileInputRef.current?.click();
+              handleDropzoneOpen();
             }
           }}
         >
@@ -314,6 +420,14 @@ function PostInputForm({
             onChange={handleFileInputChange}
           />
         </div>
+
+        <p
+          id="post-images-error"
+          className={styles.fieldErrorText}
+          role="alert"
+        >
+          {showImagesRequiredError ? imagesRequiredError : ''}
+        </p>
 
         {images.length > 0 && (
           <ul className={styles.thumbnailGrid}>

@@ -338,6 +338,50 @@
 }
 
 /* =========================================
+   Inline Field Validation
+========================================= */
+
+.requiredMark {
+  margin-left: 2px;
+
+  color: var(--error);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.counterAtLimit {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.inputInvalid {
+  border-color: var(--error) !important;
+}
+
+.inputInvalid:focus {
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.1) !important;
+}
+
+.dropzoneInvalid {
+  border-color: var(--error);
+}
+
+.fieldErrorText {
+  min-height: 16px;
+  margin: 6px 0 0;
+
+  color: var(--error);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fieldErrorText:empty {
+  margin: 0;
+}
+
+/* =========================================
    Responsive
 ========================================= */
 
