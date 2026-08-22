@@ -451,7 +451,7 @@ function AppContent() {
                   className="primary-button"
                   onClick={handleStartNewContent}
                 >
-                  새 카드뉴스 만들기
+                  카드뉴스 만들기
                 </button>
               </div>
             </div>

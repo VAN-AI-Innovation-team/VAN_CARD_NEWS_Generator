@@ -61,16 +61,29 @@ export interface PreviewTemplate {
   };
 }
 
+export interface CropArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface CardGenerationResult {
   cover: {
     title: string;
     highlight: string;
+    imageId: number | null;
+    cropArea: CropArea | null;
   };
+
   content: Array<{
     title: string;
     body: string;
     highlight: string;
+    imageId: number | null;
+    cropArea: CropArea | null;
   }>;
+
   closing: {
     cta: string;
   };

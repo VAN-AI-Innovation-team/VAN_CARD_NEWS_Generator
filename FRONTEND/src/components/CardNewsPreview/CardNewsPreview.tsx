@@ -83,6 +83,17 @@ function getLayoutCard(
   };
 }
 
+function getContentImage(
+  content: RenderContext['content'],
+  images: PreviewImage[],
+): PreviewImage | undefined {
+  if (!('imageId' in content) || content.imageId == null) {
+    return undefined;
+  }
+
+  return images.find((image) => image.id === content.imageId);
+}
+
 function renderElement(
   elementKey: string,
   element: LayoutElement,
@@ -90,7 +101,7 @@ function renderElement(
 ) {
   const { template, content, images } = context;
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${element.x}%`,
     top: `${element.y}%`,
     width: `${element.width}%`,
@@ -102,10 +113,10 @@ function renderElement(
       element.backgroundToken,
     ),
     textAlign: element.align ?? 'left',
-  } as React.CSSProperties;
+  };
 
   if (element.role === 'image') {
-    const image = images[0];
+    const image = getContentImage(content, images);
 
     return (
       <div
@@ -142,7 +153,9 @@ function renderElement(
     element.role === 'title' ||
     element.role === 'body' ||
     element.role === 'highlight' ||
-    element.role === 'eyebrow'
+    element.role === 'eyebrow' ||
+    element.role === 'footer' ||
+    element.role === 'badge'
   ) {
     const text = element.text ?? getText(element.role, content);
 
