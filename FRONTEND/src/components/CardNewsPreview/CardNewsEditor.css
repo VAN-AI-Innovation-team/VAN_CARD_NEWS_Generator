@@ -221,6 +221,13 @@
   font-size: 13px;
 }
 
+.card-news-editor__success {
+  margin: 0;
+  color: #2e7d32;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .card-news-editor__save {
   width: 100%;
 

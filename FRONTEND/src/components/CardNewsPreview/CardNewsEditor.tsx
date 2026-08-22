@@ -63,6 +63,7 @@ export default function CardNewsEditor({
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (preview.cardGenerationResult) {
@@ -138,6 +139,7 @@ export default function CardNewsEditor({
       if (selectedCardIndex === 0) {
         next.cover.imageId = imageId;
         next.cover.cropArea = null;
+
         return next;
       }
 
@@ -145,7 +147,6 @@ export default function CardNewsEditor({
         const contentIndex = selectedCardIndex - 1;
 
         next.content[contentIndex].imageId = imageId;
-
         next.content[contentIndex].cropArea = null;
 
         return next;
@@ -273,6 +274,7 @@ export default function CardNewsEditor({
     try {
       setIsSaving(true);
       setError(null);
+      setSuccessMessage(null);
 
       const updatedPreview = await updateContentPreview(
         preview.contentId,
@@ -280,6 +282,8 @@ export default function CardNewsEditor({
       );
 
       onUpdated(updatedPreview);
+
+      setSuccessMessage('수정 내용이 저장되었습니다.');
     } catch (saveError) {
       console.error('카드 구성 수정 저장 실패:', saveError);
 
@@ -333,6 +337,7 @@ export default function CardNewsEditor({
           <div className="card-news-editor__preview-header">
             <div>
               <span>LIVE PREVIEW</span>
+
               <strong>
                 CARD {String(selectedCardIndex + 1).padStart(2, '0')}
               </strong>
@@ -471,6 +476,10 @@ export default function CardNewsEditor({
           )}
 
           {error && <p className="card-news-editor__error">{error}</p>}
+
+          {successMessage && (
+            <p className="card-news-editor__success">{successMessage}</p>
+          )}
 
           <button
             type="button"

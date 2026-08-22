@@ -5,6 +5,7 @@ import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.service.ContentService;
+import com.van.cardnews.domain.content.dto.request.CardImagePlacementUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -54,6 +55,20 @@ public class ContentController {
     ) {
         ContentPreviewResponse response =
                 contentService.updatePreview(
+                        contentId,
+                        request
+                );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{contentId}/images/crop")
+    public ResponseEntity<ContentPreviewResponse> updateImageCrops(
+            @PathVariable Long contentId,
+            @Valid @RequestBody CardImagePlacementUpdateRequest request
+    ) {
+        ContentPreviewResponse response =
+                contentService.updateImageCrops(
                         contentId,
                         request
                 );
