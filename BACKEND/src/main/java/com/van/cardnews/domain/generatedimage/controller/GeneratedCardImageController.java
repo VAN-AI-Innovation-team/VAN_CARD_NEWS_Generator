@@ -5,6 +5,10 @@ import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.generatedimage.service.CardImageGenerationService;
 import com.van.cardnews.domain.generatedimage.service.GeneratedImageZipService;
+import com.van.cardnews.domain.approval.entity.ApprovalStatus;
+import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.global.exception.CustomException;
+import com.van.cardnews.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -23,6 +27,7 @@ public class GeneratedCardImageController {
     private final CardImageGenerationService cardImageGenerationService;
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final GeneratedImageZipService generatedImageZipService;
+    private final ApprovalRequestRepository approvalRequestRepository;
 
     /** 카드뉴스 이미지 생성 트리거 (Higgsfield 호출 → 저장 → 3분할 후처리) */
     @PostMapping("/generate")
@@ -51,6 +56,8 @@ public class GeneratedCardImageController {
         GeneratedCardImage image = generatedCardImageRepository.findById(imageId)
                 .orElseThrow(() -> new IllegalArgumentException("이미지를 찾을 수 없습니다: " + imageId));
 
+        validateApproved(contentId);
+
         // [확인 필요] storageRef가 로컬 절대경로라는 전제 (LocalImageStorageService 기준)
         Resource resource = new FileSystemResource(image.getStorageRef());
 
@@ -65,6 +72,8 @@ public class GeneratedCardImageController {
     /** 일괄 다운로드 — ZIP (CN-007) */
     @GetMapping("/download-all")
     public ResponseEntity<byte[]> downloadAll(@PathVariable Long contentId) {
+        validateApproved(contentId);
+
         List<GeneratedCardImage> images =
                 generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
         byte[] zip = generatedImageZipService.zip(images);
@@ -74,5 +83,16 @@ public class GeneratedCardImageController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"content-" + contentId + "-cards.zip\"")
                 .body(zip);
+    }
+
+    private void validateApproved(Long contentId) {
+        boolean approved = approvalRequestRepository
+                .findTopByContentIdOrderByRequestedAtDesc(contentId)
+                .map(request -> request.getStatus() == ApprovalStatus.APPROVED)
+                .orElse(false);
+
+        if (!approved) {
+            throw new CustomException(ErrorCode.CONTENT_NOT_APPROVED);
+        }
     }
 }

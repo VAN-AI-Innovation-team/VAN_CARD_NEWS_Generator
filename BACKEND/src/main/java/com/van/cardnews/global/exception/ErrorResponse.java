@@ -1,5 +1,7 @@
 package com.van.cardnews.global.exception;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import java.time.LocalDateTime;
 
 public record ErrorResponse(
@@ -13,7 +15,7 @@ public record ErrorResponse(
                 errorCode.getStatus().value(),
                 errorCode.name(),
                 errorCode.getDefaultMessage(),
-                LocalDateTime.now()
+                KoreaTime.now()
         );
     }
 
@@ -22,7 +24,7 @@ public record ErrorResponse(
                 errorCode.getStatus().value(),
                 errorCode.name(),
                 message,
-                LocalDateTime.now()
+                KoreaTime.now()
         );
     }
 }

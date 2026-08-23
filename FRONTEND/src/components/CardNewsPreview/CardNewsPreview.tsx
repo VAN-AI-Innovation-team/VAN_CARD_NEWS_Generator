@@ -288,12 +288,12 @@ function renderElement(
     Object.assign(style, getShapeStyle(element));
 
     const dynamicText = getContentFieldValue(element.contentField, content);
+    const roleText = getText(element.role, content);
 
     // contentField가 지정된 요소는 실제 카드 데이터를 우선합니다.
-    // 값이 아직 없으면 템플릿의 placeholder/default text를 표시합니다.
-    const text = element.contentField
-      ? dynamicText || element.text || ''
-      : (element.text ?? getText(element.role, content));
+    // 일부 기존 템플릿은 highlight/title/body 요소에 contentField가 빠져 있어도
+    // 카드 데이터가 존재하므로, 역할에 해당하는 실제 값도 우선 반영합니다.
+    const text = dynamicText || roleText || element.text || '';
 
     return (
       <div

@@ -227,6 +227,15 @@ export async function generateCardImages(
   return response.data;
 }
 
+export async function fetchGeneratedCardImages(
+  contentId: number,
+): Promise<GeneratedCardImageResponse[]> {
+  const response = await axios.get<GeneratedCardImageResponse[]>(
+    `/api/contents/${contentId}/generated-images`,
+  );
+  return response.data;
+}
+
 export async function requestContentApproval(
   contentId: number,
 ): Promise<ApprovalRequestResponse> {

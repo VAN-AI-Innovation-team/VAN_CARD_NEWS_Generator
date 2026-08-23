@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.jobhistory.entity;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import com.van.cardnews.domain.content.entity.Content;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -53,7 +55,7 @@ public class JobHistory {
         this.content = content;
         this.jobType = jobType;
         this.status = JobStatus.PENDING;
-        this.requestedAt = LocalDateTime.now();
+        this.requestedAt = KoreaTime.now();
     }
 
     public static JobHistory createPending(Content content, JobType jobType) {
@@ -70,12 +72,12 @@ public class JobHistory {
     public void markCompleted(String resultUrl) {
         this.status = JobStatus.COMPLETED;
         this.resultUrl = resultUrl;
-        this.completedAt = LocalDateTime.now();
+        this.completedAt = KoreaTime.now();
     }
 
     public void markFailed(String errorMessage) {
         this.status = JobStatus.FAILED;
         this.errorMessage = errorMessage;
-        this.completedAt = LocalDateTime.now();
+        this.completedAt = KoreaTime.now();
     }
 }

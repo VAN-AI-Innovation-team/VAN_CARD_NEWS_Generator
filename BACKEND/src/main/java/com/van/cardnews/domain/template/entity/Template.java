@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.template.entity;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -165,13 +167,13 @@ public class Template {
 
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = KoreaTime.now();
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = KoreaTime.now();
     }
 }

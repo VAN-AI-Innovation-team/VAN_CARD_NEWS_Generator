@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * 콘텐츠 승인 요청 이력입니다.
@@ -63,7 +64,7 @@ public class ApprovalRequest {
         this.content = content;
         this.requesterId = requesterId;
         this.status = ApprovalStatus.PENDING;
-        this.requestedAt = LocalDateTime.now();
+        this.requestedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public static ApprovalRequest create(
@@ -84,7 +85,7 @@ public class ApprovalRequest {
 
         this.status = ApprovalStatus.APPROVED;
         this.approverId = approverId;
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         this.reason = null;
     }
 
@@ -104,7 +105,7 @@ public class ApprovalRequest {
         this.status = ApprovalStatus.REJECTED;
         this.approverId = approverId;
         this.reason = reason;
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     private void validatePending() {
