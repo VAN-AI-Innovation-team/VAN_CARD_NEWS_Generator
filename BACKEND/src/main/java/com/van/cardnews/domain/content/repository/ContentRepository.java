@@ -1,10 +1,12 @@
 package com.van.cardnews.domain.content.repository;
 
 import com.van.cardnews.domain.content.entity.Content;
+import com.van.cardnews.domain.content.entity.ContentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ContentRepository extends JpaRepository<Content, Long> {
@@ -26,4 +28,6 @@ public interface ContentRepository extends JpaRepository<Content, Long> {
     Optional<Content> findByIdWithImages(
             @Param("contentId") Long contentId
     );
+
+    List<Content> findByStatusNotOrderByCreatedAtDesc(ContentStatus status);
 }

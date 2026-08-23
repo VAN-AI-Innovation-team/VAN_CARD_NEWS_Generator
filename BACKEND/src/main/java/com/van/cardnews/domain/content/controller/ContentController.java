@@ -1,6 +1,7 @@
 package com.van.cardnews.domain.content.controller;
 
 import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
+import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
@@ -48,6 +49,17 @@ public class ContentController {
      * 수정된 CardGenerationResult를 저장하고,
      * 최종 생성 파이프라인에서 해당 결과를 사용합니다.
      */
+    @PutMapping(value = "/{contentId}/edit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ContentCreateResponse> editContent(
+            @PathVariable Long contentId,
+            @RequestPart("data") @Valid ContentEditRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) {
+        List<MultipartFile> safeImages = images != null ? images : Collections.emptyList();
+        ContentCreateResponse response = contentService.editContent(contentId, request, safeImages);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{contentId}/preview")
     public ResponseEntity<ContentPreviewResponse> updatePreview(
             @PathVariable Long contentId,

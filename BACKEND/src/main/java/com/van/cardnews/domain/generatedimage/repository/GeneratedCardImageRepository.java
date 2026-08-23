@@ -9,5 +9,7 @@ public interface GeneratedCardImageRepository extends JpaRepository<GeneratedCar
 
     List<GeneratedCardImage> findByContent_IdOrderBySortOrderAsc(Long contentId);
 
+    long countByContent_Id(Long contentId);
+
     void deleteByContent_Id(Long contentId);
 }

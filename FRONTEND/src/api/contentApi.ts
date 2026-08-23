@@ -177,6 +177,42 @@ export async function fetchContentPreview(
   return response.data;
 }
 
+export interface EditContentPayload {
+  title: string;
+  body: string;
+  templateId: number;
+  keepImageIds: number[];
+  images: File[];
+}
+
+export async function editContent(
+  contentId: number,
+  payload: EditContentPayload,
+): Promise<CreateContentResponse> {
+  const formData = new FormData();
+  formData.append(
+    'data',
+    new Blob(
+      [
+        JSON.stringify({
+          title: payload.title,
+          body: payload.body,
+          templateId: payload.templateId,
+          keepImageIds: payload.keepImageIds,
+        }),
+      ],
+      { type: 'application/json' },
+    ),
+  );
+  payload.images.forEach((image) => formData.append('images', image));
+
+  const response = await axios.put<CreateContentResponse>(
+    `/api/contents/${contentId}/edit`,
+    formData,
+  );
+  return response.data;
+}
+
 export async function updateContentPreview(
   contentId: number,
   cardGenerationResult: CardGenerationResult,
@@ -251,4 +287,22 @@ export interface ApprovalRequestResponse {
   contentId: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   requestedAt: string;
+}
+
+export interface ContentManagementListItem {
+  contentId: number;
+  title: string;
+  createdAt: string;
+  cardCount: number;
+  contentStatus: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  approvalRequestId: number | null;
+}
+
+export async function fetchContentManagementList(): Promise<
+  ContentManagementListItem[]
+> {
+  const response =
+    await axios.get<ContentManagementListItem[]>('/api/contents');
+  return response.data;
 }
