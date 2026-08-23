@@ -14,6 +14,9 @@ import GenerationError from './components/GenerationState/GenerationError';
 import ApprovalList from './components/ApprovalReview/ApprovalList';
 import ApprovalReview from './components/ApprovalReview/ApprovalReview';
 import type { ApprovalRequestListItem } from './api/approvalApi';
+import ContentManagement from './components/ContentManagement/ContentManagement';
+import ContentManagementDetail from './components/ContentManagement/ContentManagementDetail';
+import type { ContentManagementListItem } from './api/contentApi';
 
 import ContentTypeSelector from './components/ContentTypeSelector/ContentTypeSelector';
 
@@ -21,6 +24,7 @@ import type { ContentType } from './types/content';
 
 import {
   createContent,
+  editContent,
   fetchContentPreview,
   generateCardImages,
   type GeneratedCardImageResponse,
@@ -30,7 +34,12 @@ import {
 import './App.css';
 
 type Step = 1 | 2 | 3 | 4 | 5;
-type AppScreen = 'create' | 'approval-list' | 'approval-review';
+type AppScreen =
+  | 'create'
+  | 'approval-list'
+  | 'approval-review'
+  | 'content-management'
+  | 'content-management-detail';
 
 const PREVIEW_POLL_INTERVAL = 1000;
 const PREVIEW_POLL_MAX_COUNT = 30;
@@ -49,6 +58,8 @@ function AppContent() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedApprovalRequest, setSelectedApprovalRequest] =
     useState<ApprovalRequestListItem | null>(null);
+  const [selectedManagedContent, setSelectedManagedContent] =
+    useState<ContentManagementListItem | null>(null);
 
   const [message, setMessage] = useState('연동 확인 중...');
 
@@ -58,6 +69,10 @@ function AppContent() {
   const [postData, setPostData] = useState<PostInputFormSubmitPayload | null>(
     null,
   );
+  const [editingContentId, setEditingContentId] = useState<number | null>(null);
+  const [editingExistingImages, setEditingExistingImages] = useState<
+    { id: number; imageUrl: string }[]
+  >([]);
 
   const [isCreating, setIsCreating] = useState(false);
 
@@ -73,13 +88,14 @@ function AppContent() {
     string | null
   >(null);
 
-  const { selectedTemplateId, clearSelectedTemplate } = useTemplate();
+  const { selectedTemplateId, setSelectedTemplateId, clearSelectedTemplate } =
+    useTemplate();
 
   const isPostDataValid =
     postData !== null &&
     postData.title.trim().length > 0 &&
     postData.body.trim().length > 0 &&
-    postData.images.length > 0;
+    postData.images.length + (postData.existingImageIds?.length ?? 0) > 0;
 
   async function checkBackendConnection() {
     try {
@@ -140,12 +156,20 @@ function AppContent() {
       setPreviewError(null);
       setPreview(null);
 
-      const response = await createContent({
-        title: postData.title,
-        body: postData.body,
-        images: postData.images,
-        templateId: selectedTemplateId,
-      });
+      const response = editingContentId
+        ? await editContent(editingContentId, {
+            title: postData.title,
+            body: postData.body,
+            images: postData.images,
+            templateId: selectedTemplateId,
+            keepImageIds: postData.existingImageIds ?? [],
+          })
+        : await createContent({
+            title: postData.title,
+            body: postData.body,
+            images: postData.images,
+            templateId: selectedTemplateId,
+          });
 
       const previewData = await waitForPreview(response.contentId);
 
@@ -216,10 +240,37 @@ function AppContent() {
     setStep(1);
   }
 
+  function handleEditManagedContent(previewData: ContentPreviewResponse) {
+    setEditingContentId(previewData.contentId);
+    setSelectedContentType(previewData.template.contentType as ContentType);
+    setPostData({
+      title: previewData.title,
+      body: previewData.body,
+      images: [],
+      existingImageIds: previewData.images.map((image) => image.id),
+    });
+    setEditingExistingImages(
+      previewData.images.map((image) => ({
+        id: image.id,
+        imageUrl: image.imageUrl,
+      })),
+    );
+    setPreview(previewData);
+    setGeneratedImages([]);
+    setPreviewError(null);
+    setGenerationImageError(null);
+    setStep(1);
+    setScreen('create');
+    clearSelectedTemplate();
+    setSelectedTemplateId(previewData.template.id);
+  }
+
   function handleStartNewContent() {
     setStep(1);
     setSelectedContentType(null);
     setPostData(null);
+    setEditingContentId(null);
+    setEditingExistingImages([]);
     setPreview(null);
     setPreviewError(null);
     setGeneratedImages([]);
@@ -296,7 +347,27 @@ function AppContent() {
               <button
                 type="button"
                 className={`app-sidebar__item ${
-                  screen !== 'create' ? 'app-sidebar__item--active' : ''
+                  screen === 'content-management' ||
+                  screen === 'content-management-detail'
+                    ? 'app-sidebar__item--active'
+                    : ''
+                }`}
+                onClick={() => {
+                  setScreen('content-management');
+                  setSelectedManagedContent(null);
+                  setIsMenuOpen(false);
+                }}
+              >
+                <span>콘텐츠 관리</span>
+                <small>생성 콘텐츠 확인·다운로드</small>
+              </button>
+
+              <button
+                type="button"
+                className={`app-sidebar__item ${
+                  screen === 'approval-list' || screen === 'approval-review'
+                    ? 'app-sidebar__item--active'
+                    : ''
                 }`}
                 onClick={() => {
                   setScreen('approval-list');
@@ -477,6 +548,7 @@ function AppContent() {
 
                   <PostInputForm
                     initialData={postData}
+                    initialExistingImages={editingExistingImages}
                     onChange={setPostData}
                   />
 
@@ -639,6 +711,20 @@ function AppContent() {
               )}
             </section>
           </>
+        ) : screen === 'content-management' ? (
+          <ContentManagement
+            onSelect={(content) => {
+              setSelectedManagedContent(content);
+              setScreen('content-management-detail');
+            }}
+          />
+        ) : screen === 'content-management-detail' && selectedManagedContent ? (
+          <ContentManagementDetail
+            content={selectedManagedContent}
+            onBack={() => setScreen('content-management')}
+            onUpdated={() => undefined}
+            onEdit={handleEditManagedContent}
+          />
         ) : screen === 'approval-list' ? (
           <ApprovalList
             onSelect={(request) => {

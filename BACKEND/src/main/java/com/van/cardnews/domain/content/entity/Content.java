@@ -95,6 +95,29 @@ public class Content {
         image.assignContent(this);
     }
 
+    public void updateBasicInfo(
+            String title,
+            String body,
+            Template template
+    ) {
+        this.title = title;
+        this.body = body;
+        this.template = template;
+        this.cardGenerationResult = null;
+        this.cardImagePlacements = null;
+    }
+
+    public void removeImagesNotIn(java.util.Set<Long> keepImageIds) {
+        this.images.removeIf(image -> !keepImageIds.contains(image.getId()));
+        reorderImages();
+    }
+
+    public void reorderImages() {
+        for (int i = 0; i < images.size(); i++) {
+            images.get(i).updateSortOrder(i);
+        }
+    }
+
     // 1번 필드 업데이트 메서드
     public void updateCardGenerationResult(JsonNode cardGenerationResult) {
         this.cardGenerationResult = cardGenerationResult;

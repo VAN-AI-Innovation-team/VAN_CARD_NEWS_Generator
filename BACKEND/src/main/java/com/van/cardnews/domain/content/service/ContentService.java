@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.van.cardnews.domain.content.dto.request.CardImagePlacementUpdateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
+import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
@@ -12,6 +13,7 @@ import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentImage;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import com.van.cardnews.domain.generation.service.CardGenerationValidator;
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
@@ -47,6 +49,7 @@ public class ContentService {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final ApprovalRequestRepository approvalRequestRepository;
+    private final GeneratedCardImageRepository generatedCardImageRepository;
 
     @Transactional
     public ContentCreateResponse createContent(
@@ -125,6 +128,49 @@ public class ContentService {
                 content,
                 approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
         );
+    }
+
+    @Transactional
+    public ContentCreateResponse editContent(
+            Long contentId,
+            ContentEditRequest request,
+            List<MultipartFile> newImages
+    ) {
+        validateImageCount(newImages);
+
+        Content content = contentRepository.findByIdWithImages(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        Template template = templateRepository.findByIdAndActiveTrue(request.templateId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TEMPLATE_NOT_FOUND));
+
+        java.util.Set<Long> keepImageIds = request.keepImageIds() == null
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(request.keepImageIds());
+
+        boolean allKeepIdsBelongToContent = content.getImages().stream()
+                .filter(image -> keepImageIds.contains(image.getId()))
+                .count() == keepImageIds.size();
+        if (!allKeepIdsBelongToContent) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "해당 콘텐츠에 존재하지 않는 이미지가 포함되어 있습니다.");
+        }
+
+        content.removeImagesNotIn(keepImageIds);
+        attachImages(content, newImages);
+        if (content.getImages().isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "사진을 최소 1장 이상 유지하거나 추가해주세요.");
+        }
+        content.updateBasicInfo(request.title().trim(), request.body().trim(), template);
+
+        generatedCardImageRepository.deleteByContent_Id(contentId);
+
+        JobHistory jobHistory = jobHistoryService.createJobHistory(content, JobType.FULL_PIPELINE);
+        eventPublisher.publishEvent(new ContentGenerationRequestedEvent(contentId, jobHistory.getId()));
+
+        log.info("콘텐츠 수정 후 재생성 요청 - contentId={}, jobHistoryId={}, templateId={}",
+                contentId, jobHistory.getId(), template.getId());
+
+        return ContentCreateResponse.of(content, jobHistory);
     }
 
     @Transactional
@@ -287,7 +333,7 @@ public class ContentService {
             return;
         }
 
-        int order = 0;
+        int order = content.getImages().size();
 
         for (MultipartFile image : images) {
             String imageUrl =

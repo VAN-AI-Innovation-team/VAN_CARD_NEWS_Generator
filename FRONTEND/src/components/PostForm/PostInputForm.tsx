@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from './PostInputForm.module.css';
 
+export interface ExistingImageInput {
+  id: number;
+  imageUrl: string;
+}
+
 export interface PostInputFormSubmitPayload {
   title: string;
   body: string;
   images: File[];
+  existingImageIds?: number[];
 }
 
 interface PostInputFormProps {
@@ -12,6 +18,9 @@ interface PostInputFormProps {
 
   // 이전 단계로 돌아왔을 때 기존 입력값 복원
   initialData?: PostInputFormSubmitPayload | null;
+
+  // 기존 콘텐츠 수정 시 서버에 저장되어 있는 원본 이미지
+  initialExistingImages?: ExistingImageInput[];
 
   // 최대 업로드 가능 이미지 개수
   maxImages?: number;
@@ -32,12 +41,16 @@ const BODY_MAX_LENGTH = 1000;
 function PostInputForm({
   onChange,
   initialData,
+  initialExistingImages = [],
   maxImages = 10,
   maxImageSizeMB = 10,
 }: PostInputFormProps) {
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [existingImages, setExistingImages] = useState<ExistingImageInput[]>(
+    initialExistingImages,
+  );
   const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -66,6 +79,7 @@ function PostInputForm({
 
     setTitle(initialData.title);
     setBody(initialData.body);
+    setExistingImages(initialExistingImages);
 
     const restoredImages: ImageItem[] = initialData.images.map(
       (file, index) => ({
@@ -82,7 +96,7 @@ function PostInputForm({
 
       return restoredImages;
     });
-  }, [initialData]);
+  }, [initialData, initialExistingImages]);
 
   /**
    * 컴포넌트가 사라지거나 이미지 목록이 변경될 때
@@ -108,6 +122,7 @@ function PostInputForm({
       title: nextTitle,
       body: nextBody,
       images: nextImages.map((image) => image.file),
+      existingImageIds: existingImages.map((image) => image.id),
     });
   }
 
@@ -118,8 +133,10 @@ function PostInputForm({
   const bodyRequiredError =
     body.trim().length === 0 ? '본문을 입력해주세요.' : null;
 
+  const totalImageCount = existingImages.length + images.length;
+
   const imagesRequiredError =
-    images.length === 0 ? '사진을 최소 1장 이상 등록해주세요.' : null;
+    totalImageCount === 0 ? '사진을 최소 1장 이상 등록해주세요.' : null;
 
   const showTitleRequiredError = titleTouched && Boolean(titleRequiredError);
   const showBodyRequiredError = bodyTouched && Boolean(bodyRequiredError);
@@ -186,7 +203,8 @@ function PostInputForm({
     }
 
     setImages((previousImages) => {
-      const remainingSlots = maxImages - previousImages.length;
+      const remainingSlots =
+        maxImages - existingImages.length - previousImages.length;
 
       if (remainingSlots <= 0) {
         setErrorMessage(`사진은 최대 ${maxImages}장까지 업로드할 수 있어요.`);
@@ -245,6 +263,23 @@ function PostInputForm({
   function handleDropzoneOpen() {
     setImagesTouched(true);
     fileInputRef.current?.click();
+  }
+
+  function handleRemoveExistingImage(id: number) {
+    setImagesTouched(true);
+
+    setExistingImages((previousImages) => {
+      const nextImages = previousImages.filter((image) => image.id !== id);
+
+      onChange?.({
+        title,
+        body,
+        images: images.map((image) => image.file),
+        existingImageIds: nextImages.map((image) => image.id),
+      });
+
+      return nextImages;
+    });
   }
 
   function handleRemoveImage(id: string) {
@@ -381,7 +416,7 @@ function PostInputForm({
           </span>
 
           <span className={styles.counter}>
-            {images.length} / {maxImages}
+            {totalImageCount} / {maxImages}
           </span>
         </div>
 
@@ -429,8 +464,25 @@ function PostInputForm({
           {showImagesRequiredError ? imagesRequiredError : ''}
         </p>
 
-        {images.length > 0 && (
+        {totalImageCount > 0 && (
           <ul className={styles.thumbnailGrid}>
+            {existingImages.map((image) => (
+              <li key={`existing-${image.id}`} className={styles.thumbnailItem}>
+                <img
+                  src={image.imageUrl}
+                  alt="기존 업로드 이미지"
+                  className={styles.thumbnailImage}
+                />
+                <button
+                  type="button"
+                  className={styles.thumbnailRemoveButton}
+                  onClick={() => handleRemoveExistingImage(image.id)}
+                  aria-label="기존 이미지 삭제"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
             {images.map((image) => (
               <li key={image.id} className={styles.thumbnailItem}>
                 <img

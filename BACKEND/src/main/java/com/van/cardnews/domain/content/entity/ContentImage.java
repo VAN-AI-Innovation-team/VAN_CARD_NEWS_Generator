@@ -128,6 +128,10 @@ public class ContentImage {
         this.storageRef = storageRef;
     }
 
+    public void updateSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
     void assignContent(Content content) {
         this.content = content;
     }
