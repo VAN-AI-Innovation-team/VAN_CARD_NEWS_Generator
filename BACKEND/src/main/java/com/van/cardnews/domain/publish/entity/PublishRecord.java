@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.publish.entity;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import com.van.cardnews.domain.content.entity.Content;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -105,7 +107,7 @@ public class PublishRecord {
     public void markSuccess(String externalPostId) {
         this.result = PublishResult.SUCCESS;
         this.externalPostId = externalPostId;
-        this.publishedAt = LocalDateTime.now();
+        this.publishedAt = KoreaTime.now();
         this.errorMessage = null;
     }
 

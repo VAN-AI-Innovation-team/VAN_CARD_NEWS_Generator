@@ -61,6 +61,124 @@
 }
 
 /* =========================================
+   Header Actions / Sidebar
+========================================= */
+
+.app-header {
+  position: relative;
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.menu-button {
+  width: 38px;
+  height: 38px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid #d6dde7;
+  border-radius: 5px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.menu-button:hover {
+  border-color: #173d73;
+  background: #f7f9fc;
+}
+
+.menu-button span {
+  width: 17px;
+  height: 2px;
+  border-radius: 2px;
+  background: #344056;
+}
+
+.app-sidebar {
+  position: absolute;
+  z-index: 20;
+  top: 79px;
+  right: 0;
+  width: 280px;
+  min-height: 100%;
+  padding: 18px;
+  border-left: 1px solid #dce2ea;
+  border-bottom: 1px solid #dce2ea;
+  background: #ffffff;
+  box-shadow: -8px 10px 24px rgba(23, 32, 51, 0.08);
+}
+
+.app-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e4e8ef;
+  color: #172033;
+  font-size: 14px;
+}
+
+.app-sidebar__header button {
+  border: 0;
+  background: transparent;
+  color: #718096;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.app-sidebar__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 12px;
+  margin-top: 5px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-sidebar__item:hover,
+.app-sidebar__item--active {
+  border-color: #d8e1ed;
+  background: #f4f7fb;
+  color: #173d73;
+}
+
+.app-sidebar__item span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-sidebar__item small {
+  color: #7b8798;
+  font-size: 10px;
+}
+
+@media (max-width: 800px) {
+  .app-header__actions {
+    gap: 10px;
+  }
+
+  .app-sidebar {
+    top: 69px;
+    width: min(280px, 86vw);
+  }
+}
+
+/* =========================================
    Backend Connection Status
 ========================================= */
 

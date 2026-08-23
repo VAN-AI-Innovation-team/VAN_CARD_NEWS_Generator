@@ -454,9 +454,11 @@ export default function CardNewsEditor({
                   <button
                     type="button"
                     className="card-news-editor__delete"
+                    aria-label="선택한 카드 삭제"
+                    title="카드 삭제"
                     onClick={deleteSelectedContentCard}
                   >
-                    삭제
+                    ×
                   </button>
                 </div>
               )}

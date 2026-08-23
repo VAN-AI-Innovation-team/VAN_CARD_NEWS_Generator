@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.generatedimage.entity;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import com.van.cardnews.domain.content.entity.Content;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -103,7 +105,7 @@ public class GeneratedCardImage {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = KoreaTime.now();
     }
 
     public enum CardType { COVER, CONTENT, CLOSING }

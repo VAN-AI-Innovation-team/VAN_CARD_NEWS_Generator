@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.content.entity;
 
+import com.van.cardnews.global.time.KoreaTime;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.van.cardnews.domain.template.entity.Template;
 import jakarta.persistence.*;
@@ -113,13 +115,13 @@ public class Content {
 
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = KoreaTime.now();
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = KoreaTime.now();
     }
 }

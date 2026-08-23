@@ -1,31 +1,58 @@
 package com.van.cardnews.domain.approval.controller;
 
+import com.van.cardnews.domain.approval.dto.request.ApprovalRejectRequest;
+import com.van.cardnews.domain.approval.dto.response.ApprovalRequestListResponse;
 import com.van.cardnews.domain.approval.dto.response.ApprovalRequestResponse;
 import com.van.cardnews.domain.approval.service.ApprovalRequestService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
-@RequestMapping("/api/contents/{contentId}/approval-requests")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class ApprovalRequestController {
 
     private final ApprovalRequestService approvalRequestService;
 
-    @PostMapping
+    @PostMapping("/contents/{contentId}/approval-requests")
     public ResponseEntity<ApprovalRequestResponse> requestApproval(
             @PathVariable Long contentId
     ) {
-        ApprovalRequestResponse response =
-                approvalRequestService.requestApproval(contentId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(approvalRequestService.requestApproval(contentId));
+    }
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+    @GetMapping("/approval-requests")
+    public ResponseEntity<List<ApprovalRequestListResponse>> getPendingRequests() {
+        return ResponseEntity.ok(approvalRequestService.getPendingRequests());
+    }
+
+    @GetMapping("/approval-requests/{approvalRequestId}")
+    public ResponseEntity<ApprovalRequestResponse> getRequest(
+            @PathVariable Long approvalRequestId
+    ) {
+        return ResponseEntity.ok(approvalRequestService.getRequest(approvalRequestId));
+    }
+
+    @PostMapping("/approval-requests/{approvalRequestId}/approve")
+    public ResponseEntity<ApprovalRequestResponse> approve(
+            @PathVariable Long approvalRequestId
+    ) {
+        return ResponseEntity.ok(approvalRequestService.approve(approvalRequestId));
+    }
+
+    @PostMapping("/approval-requests/{approvalRequestId}/reject")
+    public ResponseEntity<ApprovalRequestResponse> reject(
+            @PathVariable Long approvalRequestId,
+            @Valid @RequestBody ApprovalRejectRequest request
+    ) {
+        return ResponseEntity.ok(
+                approvalRequestService.reject(approvalRequestId, request)
+        );
     }
 }

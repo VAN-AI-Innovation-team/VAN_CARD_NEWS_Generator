@@ -11,6 +11,9 @@ import PostInputForm, {
 } from './components/PostForm/PostInputForm';
 import GenerationLoading from './components/GenerationState/GenerationLoading';
 import GenerationError from './components/GenerationState/GenerationError';
+import ApprovalList from './components/ApprovalReview/ApprovalList';
+import ApprovalReview from './components/ApprovalReview/ApprovalReview';
+import type { ApprovalRequestListItem } from './api/approvalApi';
 
 import ContentTypeSelector from './components/ContentTypeSelector/ContentTypeSelector';
 
@@ -27,6 +30,7 @@ import {
 import './App.css';
 
 type Step = 1 | 2 | 3 | 4 | 5;
+type AppScreen = 'create' | 'approval-list' | 'approval-review';
 
 const PREVIEW_POLL_INTERVAL = 1000;
 const PREVIEW_POLL_MAX_COUNT = 30;
@@ -41,6 +45,10 @@ function App() {
 
 function AppContent() {
   const [step, setStep] = useState<Step>(1);
+  const [screen, setScreen] = useState<AppScreen>('create');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedApprovalRequest, setSelectedApprovalRequest] =
+    useState<ApprovalRequestListItem | null>(null);
 
   const [message, setMessage] = useState('연동 확인 중...');
 
@@ -235,228 +243,244 @@ function AppContent() {
             </div>
           </div>
 
-          <div className="connection-status">
-            <span
-              className={`connection-status__dot ${
-                message === '연동 확인 중...'
-                  ? 'connection-status__dot--loading'
-                  : message === '백엔드 연결 실패'
-                    ? 'connection-status__dot--error'
-                    : 'connection-status__dot--success'
-              }`}
-            />
+          <div className="app-header__actions">
+            <div className="connection-status">
+              <span
+                className={`connection-status__dot ${
+                  message === '연동 확인 중...'
+                    ? 'connection-status__dot--loading'
+                    : message === '백엔드 연결 실패'
+                      ? 'connection-status__dot--error'
+                      : 'connection-status__dot--success'
+                }`}
+              />
 
-            <span className="connection-status__text">{message}</span>
+              <span className="connection-status__text">{message}</span>
 
-            {message === '백엔드 연결 실패' && (
+              {message === '백엔드 연결 실패' && (
+                <button
+                  type="button"
+                  className="connection-status__button"
+                  onClick={checkBackendConnection}
+                >
+                  다시 확인
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="menu-button"
+              aria-label="메뉴 열기"
+              aria-expanded={isMenuOpen}
+              onClick={() => setIsMenuOpen((open) => !open)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          </div>
+
+          {isMenuOpen && (
+            <aside className="app-sidebar">
+              <div className="app-sidebar__header">
+                <strong>메뉴</strong>
+                <button
+                  type="button"
+                  aria-label="메뉴 닫기"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
               <button
                 type="button"
-                className="connection-status__button"
-                onClick={checkBackendConnection}
+                className={`app-sidebar__item ${
+                  screen !== 'create' ? 'app-sidebar__item--active' : ''
+                }`}
+                onClick={() => {
+                  setScreen('approval-list');
+                  setSelectedApprovalRequest(null);
+                  setIsMenuOpen(false);
+                }}
               >
-                다시 확인
+                <span>검수 · 승인</span>
+                <small>승인 요청 작업물 확인</small>
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                className={`app-sidebar__item ${
+                  screen === 'create' ? 'app-sidebar__item--active' : ''
+                }`}
+                onClick={() => {
+                  setScreen('create');
+                  setIsMenuOpen(false);
+                }}
+              >
+                <span>카드뉴스 제작</span>
+                <small>새 카드뉴스 만들기</small>
+              </button>
+            </aside>
+          )}
         </div>
       </header>
 
       <main className="app-main">
-        <section className="page-intro">
-          <p className="page-intro__eyebrow">CARD NEWS GENERATOR</p>
+        {screen === 'create' ? (
+          <>
+            <section className="page-intro">
+              <p className="page-intro__eyebrow">CARD NEWS GENERATOR</p>
 
-          <h2 className="page-intro__title">새 카드뉴스 제작</h2>
+              <h2 className="page-intro__title">새 카드뉴스 제작</h2>
 
-          <p className="page-intro__description">
-            콘텐츠 정보를 입력하면 콘텐츠 유형에 맞는 템플릿을 추천하고 카드뉴스
-            제작을 진행합니다.
-          </p>
-        </section>
+              <p className="page-intro__description">
+                콘텐츠 정보를 입력하면 콘텐츠 유형에 맞는 템플릿을 추천하고
+                카드뉴스 제작을 진행합니다.
+              </p>
+            </section>
 
-        <nav className="step-navigation" aria-label="카드뉴스 제작 단계">
-          <div
-            className={`step-item ${step >= 1 ? 'step-item--active' : ''} ${
-              step > 1 ? 'step-item--completed' : ''
-            }`}
-          >
-            <span className="step-item__number">01</span>
+            <nav className="step-navigation" aria-label="카드뉴스 제작 단계">
+              <div
+                className={`step-item ${step >= 1 ? 'step-item--active' : ''} ${
+                  step > 1 ? 'step-item--completed' : ''
+                }`}
+              >
+                <span className="step-item__number">01</span>
 
-            <div className="step-item__content">
-              <span className="step-item__label">콘텐츠 유형</span>
+                <div className="step-item__content">
+                  <span className="step-item__label">콘텐츠 유형</span>
 
-              <span className="step-item__description">제작 목적 선택</span>
-            </div>
-          </div>
-
-          <span className="step-navigation__line" />
-
-          <div
-            className={`step-item ${step >= 2 ? 'step-item--active' : ''} ${
-              step > 2 ? 'step-item--completed' : ''
-            }`}
-          >
-            <span className="step-item__number">02</span>
-
-            <div className="step-item__content">
-              <span className="step-item__label">콘텐츠 작성</span>
-
-              <span className="step-item__description">
-                제목·본문·사진 입력
-              </span>
-            </div>
-          </div>
-
-          <span className="step-navigation__line" />
-
-          <div
-            className={`step-item ${step >= 3 ? 'step-item--active' : ''} ${
-              step > 3 ? 'step-item--completed' : ''
-            }`}
-          >
-            <span className="step-item__number">03</span>
-
-            <div className="step-item__content">
-              <span className="step-item__label">템플릿 선택</span>
-
-              <span className="step-item__description">추천 템플릿 확인</span>
-            </div>
-          </div>
-
-          <span className="step-navigation__line" />
-
-          <div
-            className={`step-item ${step >= 4 ? 'step-item--active' : ''} ${
-              step > 4 ? 'step-item--completed' : ''
-            }`}
-          >
-            <span className="step-item__number">04</span>
-
-            <div className="step-item__content">
-              <span className="step-item__label">카드 구성 확인</span>
-
-              <span className="step-item__description">카드 내용 수정</span>
-            </div>
-          </div>
-
-          <span className="step-navigation__line" />
-
-          <div className={`step-item ${step >= 5 ? 'step-item--active' : ''}`}>
-            <span className="step-item__number">05</span>
-
-            <div className="step-item__content">
-              <span className="step-item__label">생성 결과</span>
-
-              <span className="step-item__description">최종 결과 확인</span>
-            </div>
-          </div>
-        </nav>
-
-        <section className="workflow-panel">
-          {step === 1 && (
-            <div className="workflow-step">
-              <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">STEP 01 · CONTENT TYPE</p>
-
-                <h3 className="workflow-step__title">
-                  콘텐츠 유형을 선택해주세요.
-                </h3>
-
-                <p className="workflow-step__description">
-                  선택한 콘텐츠 유형을 기준으로 이후 단계에서 적합한 카드뉴스
-                  템플릿을 추천합니다.
-                </p>
+                  <span className="step-item__description">제작 목적 선택</span>
+                </div>
               </div>
 
-              <ContentTypeSelector
-                selectedType={selectedContentType}
-                onSelect={setSelectedContentType}
-              />
+              <span className="step-navigation__line" />
 
-              <div className="workflow-navigation">
-                <div />
+              <div
+                className={`step-item ${step >= 2 ? 'step-item--active' : ''} ${
+                  step > 2 ? 'step-item--completed' : ''
+                }`}
+              >
+                <span className="step-item__number">02</span>
 
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!selectedContentType}
-                  onClick={handleNextFromContentType}
-                >
-                  다음
-                  <span aria-hidden="true">→</span>
-                </button>
-              </div>
-            </div>
-          )}
+                <div className="step-item__content">
+                  <span className="step-item__label">콘텐츠 작성</span>
 
-          {step === 2 && (
-            <div className="workflow-step">
-              <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">STEP 02 · CONTENT</p>
-
-                <h3 className="workflow-step__title">
-                  카드뉴스에 사용할 내용을 입력해주세요.
-                </h3>
-
-                <p className="workflow-step__description">
-                  제목, 본문, 사진을 입력한 후 다음 단계에서 사용할 템플릿을
-                  선택합니다.
-                </p>
+                  <span className="step-item__description">
+                    제목·본문·사진 입력
+                  </span>
+                </div>
               </div>
 
-              <PostInputForm initialData={postData} onChange={setPostData} />
+              <span className="step-navigation__line" />
 
-              <div className="workflow-navigation workflow-navigation--form">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handlePreviousStep}
-                >
-                  <span aria-hidden="true">←</span>
-                  이전
-                </button>
+              <div
+                className={`step-item ${step >= 3 ? 'step-item--active' : ''} ${
+                  step > 3 ? 'step-item--completed' : ''
+                }`}
+              >
+                <span className="step-item__number">03</span>
 
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!isPostDataValid}
-                  onClick={handleNextFromContent}
-                >
-                  다음
-                  <span aria-hidden="true">→</span>
-                </button>
+                <div className="step-item__content">
+                  <span className="step-item__label">템플릿 선택</span>
+
+                  <span className="step-item__description">
+                    추천 템플릿 확인
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
 
-          {step === 3 && (
-            <div className="workflow-step">
-              {isCreating ? (
-                <GenerationLoading />
-              ) : previewError ? (
-                <GenerationError
-                  message={previewError}
-                  onRetry={() => void handleCreateContent()}
-                  onEditTemplate={() => void handleEditTemplate()}
-                  retryDisabled={!isPostDataValid || !selectedTemplateId}
-                />
-              ) : (
-                <>
+              <span className="step-navigation__line" />
+
+              <div
+                className={`step-item ${step >= 4 ? 'step-item--active' : ''} ${
+                  step > 4 ? 'step-item--completed' : ''
+                }`}
+              >
+                <span className="step-item__number">04</span>
+
+                <div className="step-item__content">
+                  <span className="step-item__label">카드 구성 확인</span>
+
+                  <span className="step-item__description">카드 내용 수정</span>
+                </div>
+              </div>
+
+              <span className="step-navigation__line" />
+
+              <div
+                className={`step-item ${step >= 5 ? 'step-item--active' : ''}`}
+              >
+                <span className="step-item__number">05</span>
+
+                <div className="step-item__content">
+                  <span className="step-item__label">생성 결과</span>
+
+                  <span className="step-item__description">최종 결과 확인</span>
+                </div>
+              </div>
+            </nav>
+
+            <section className="workflow-panel">
+              {step === 1 && (
+                <div className="workflow-step">
                   <div className="workflow-step__header">
-                    <p className="workflow-step__eyebrow">STEP 03 · TEMPLATE</p>
+                    <p className="workflow-step__eyebrow">
+                      STEP 01 · CONTENT TYPE
+                    </p>
 
                     <h3 className="workflow-step__title">
-                      추천 템플릿을 선택해주세요.
+                      콘텐츠 유형을 선택해주세요.
                     </h3>
 
                     <p className="workflow-step__description">
-                      선택한 콘텐츠 유형에 적합한 템플릿을 확인하고 카드뉴스
-                      제작에 사용할 디자인을 선택합니다.
+                      선택한 콘텐츠 유형을 기준으로 이후 단계에서 적합한
+                      카드뉴스 템플릿을 추천합니다.
                     </p>
                   </div>
 
-                  <TemplateSelector contentType={selectedContentType} />
+                  <ContentTypeSelector
+                    selectedType={selectedContentType}
+                    onSelect={setSelectedContentType}
+                  />
 
                   <div className="workflow-navigation">
+                    <div />
+
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={!selectedContentType}
+                      onClick={handleNextFromContentType}
+                    >
+                      다음
+                      <span aria-hidden="true">→</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="workflow-step">
+                  <div className="workflow-step__header">
+                    <p className="workflow-step__eyebrow">STEP 02 · CONTENT</p>
+
+                    <h3 className="workflow-step__title">
+                      카드뉴스에 사용할 내용을 입력해주세요.
+                    </h3>
+
+                    <p className="workflow-step__description">
+                      제목, 본문, 사진을 입력한 후 다음 단계에서 사용할 템플릿을
+                      선택합니다.
+                    </p>
+                  </div>
+
+                  <PostInputForm
+                    initialData={postData}
+                    onChange={setPostData}
+                  />
+
+                  <div className="workflow-navigation workflow-navigation--form">
                     <button
                       type="button"
                       className="secondary-button"
@@ -469,98 +493,168 @@ function AppContent() {
                     <button
                       type="button"
                       className="primary-button"
-                      disabled={!isPostDataValid || !selectedTemplateId}
-                      onClick={handleCreateContent}
+                      disabled={!isPostDataValid}
+                      onClick={handleNextFromContent}
                     >
-                      카드 구성 확인
+                      다음
+                      <span aria-hidden="true">→</span>
                     </button>
                   </div>
-                </>
+                </div>
               )}
-            </div>
-          )}
 
-          {step === 4 && preview && preview.cardGenerationResult && (
-            <div className="workflow-step">
-              <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">
-                  STEP 04 · CARD COMPOSITION
-                </p>
+              {step === 3 && (
+                <div className="workflow-step">
+                  {isCreating ? (
+                    <GenerationLoading />
+                  ) : previewError ? (
+                    <GenerationError
+                      message={previewError}
+                      onRetry={() => void handleCreateContent()}
+                      onEditTemplate={() => void handleEditTemplate()}
+                      retryDisabled={!isPostDataValid || !selectedTemplateId}
+                    />
+                  ) : (
+                    <>
+                      <div className="workflow-step__header">
+                        <p className="workflow-step__eyebrow">
+                          STEP 03 · TEMPLATE
+                        </p>
 
-                <h3 className="workflow-step__title">
-                  생성된 카드 구성을 확인해주세요.
-                </h3>
+                        <h3 className="workflow-step__title">
+                          추천 템플릿을 선택해주세요.
+                        </h3>
 
-                <p className="workflow-step__description">
-                  카드별 문구와 이미지를 확인하고 필요한 내용을 수정한 후
-                  카드뉴스를 생성합니다.
-                </p>
-              </div>
+                        <p className="workflow-step__description">
+                          선택한 콘텐츠 유형에 적합한 템플릿을 확인하고 카드뉴스
+                          제작에 사용할 디자인을 선택합니다.
+                        </p>
+                      </div>
 
-              <CardNewsEditor
-                preview={preview}
-                onUpdated={setPreview}
-                onGenerate={handleGenerateCardImages}
-              />
+                      <TemplateSelector contentType={selectedContentType} />
 
-              <div className="workflow-navigation">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handlePreviousStep}
-                >
-                  <span aria-hidden="true">←</span>
-                  템플릿 수정
-                </button>
-              </div>
-            </div>
-          )}
+                      <div className="workflow-navigation">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={handlePreviousStep}
+                        >
+                          <span aria-hidden="true">←</span>
+                          이전
+                        </button>
 
-          {step === 5 && preview && (
-            <div className="workflow-step">
-              <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">STEP 05 · RESULT</p>
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={!isPostDataValid || !selectedTemplateId}
+                          onClick={handleCreateContent}
+                        >
+                          카드 구성 확인
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
-                <h3 className="workflow-step__title">
-                  생성된 카드뉴스를 확인해주세요.
-                </h3>
+              {step === 4 && preview && preview.cardGenerationResult && (
+                <div className="workflow-step">
+                  <div className="workflow-step__header">
+                    <p className="workflow-step__eyebrow">
+                      STEP 04 · CARD COMPOSITION
+                    </p>
 
-                <p className="workflow-step__description">
-                  생성된 최종 카드 이미지를 확인하고 승인 요청을 진행할 수
-                  있습니다.
-                </p>
-              </div>
+                    <h3 className="workflow-step__title">
+                      생성된 카드 구성을 확인해주세요.
+                    </h3>
 
-              <ContentResult
-                preview={preview}
-                images={generatedImages}
-                isLoading={isGeneratingImages}
-                error={generationImageError}
-              />
+                    <p className="workflow-step__description">
+                      카드별 문구와 이미지를 확인하고 필요한 내용을 수정한 후
+                      카드뉴스를 생성합니다.
+                    </p>
+                  </div>
 
-              <div className="workflow-navigation">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handlePreviousStep}
-                  disabled={isGeneratingImages}
-                >
-                  <span aria-hidden="true">←</span>
-                  카드 구성 수정
-                </button>
+                  <CardNewsEditor
+                    preview={preview}
+                    onUpdated={setPreview}
+                    onGenerate={handleGenerateCardImages}
+                  />
 
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={handleStartNewContent}
-                  disabled={isGeneratingImages}
-                >
-                  새 카드뉴스 만들기
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
+                  <div className="workflow-navigation">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handlePreviousStep}
+                    >
+                      <span aria-hidden="true">←</span>
+                      템플릿 수정
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {step === 5 && preview && (
+                <div className="workflow-step">
+                  <div className="workflow-step__header">
+                    <p className="workflow-step__eyebrow">STEP 05 · RESULT</p>
+
+                    <h3 className="workflow-step__title">
+                      생성된 카드뉴스를 확인해주세요.
+                    </h3>
+
+                    <p className="workflow-step__description">
+                      생성된 최종 카드 이미지를 확인하고 승인 요청을 진행할 수
+                      있습니다.
+                    </p>
+                  </div>
+
+                  <ContentResult
+                    preview={preview}
+                    images={generatedImages}
+                    isLoading={isGeneratingImages}
+                    error={generationImageError}
+                  />
+
+                  <div className="workflow-navigation">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handlePreviousStep}
+                      disabled={isGeneratingImages}
+                    >
+                      <span aria-hidden="true">←</span>
+                      카드 구성 수정
+                    </button>
+
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={handleStartNewContent}
+                      disabled={isGeneratingImages}
+                    >
+                      새 카드뉴스 만들기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          </>
+        ) : screen === 'approval-list' ? (
+          <ApprovalList
+            onSelect={(request) => {
+              setSelectedApprovalRequest(request);
+              setScreen('approval-review');
+            }}
+          />
+        ) : selectedApprovalRequest ? (
+          <ApprovalReview
+            request={selectedApprovalRequest}
+            onBack={() => setScreen('approval-list')}
+            onCompleted={() => {
+              // 처리 직후 목록에서 상태가 반영되도록 상세 화면의 목록 이동을 유지합니다.
+            }}
+          />
+        ) : null}
       </main>
 
       <footer className="app-footer">

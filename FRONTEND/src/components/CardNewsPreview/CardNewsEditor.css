@@ -152,6 +152,7 @@
 }
 
 .card-news-editor__move-buttons button {
+  width: 34px;
   min-width: 34px;
   height: 34px;
 
@@ -173,6 +174,9 @@
 
 .card-news-editor__move-buttons .card-news-editor__delete {
   color: #c62828;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .card-news-editor__field {
