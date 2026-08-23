@@ -3,6 +3,7 @@ package com.van.cardnews.domain.content.dto.response;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentImage;
+import com.van.cardnews.domain.approval.entity.ApprovalRequest;
 
 import java.util.List;
 
@@ -11,6 +12,7 @@ public record ContentPreviewResponse(
         String title,
         String body,
         String status,
+        String approvalStatus,
         TemplatePreview template,
         JsonNode cardGenerationResult,
         JsonNode cardImagePlacements,
@@ -18,11 +20,21 @@ public record ContentPreviewResponse(
 ) {
 
     public static ContentPreviewResponse from(Content content) {
+        return from(content, null);
+    }
+
+    public static ContentPreviewResponse from(
+            Content content,
+            ApprovalRequest approvalRequest
+    ) {
         return new ContentPreviewResponse(
                 content.getId(),
                 content.getTitle(),
                 content.getBody(),
                 content.getStatus().name(),
+                approvalRequest != null
+                        ? approvalRequest.getStatus().name()
+                        : null,
                 TemplatePreview.from(content),
                 content.getCardGenerationResult(),
                 content.getCardImagePlacements(),

@@ -67,6 +67,16 @@ public enum ErrorCode {
     INVALID_TEMPLATE_CONTENT_TYPE(
             HttpStatus.BAD_REQUEST,
             "지원하지 않는 콘텐츠 유형입니다."
+    ),
+
+    CONTENT_NOT_READY_FOR_APPROVAL(
+            HttpStatus.BAD_REQUEST,
+            "카드뉴스 생성이 완료되지 않아 승인 요청할 수 없습니다."
+    ),
+
+    APPROVAL_REQUEST_ALREADY_PENDING(
+            HttpStatus.CONFLICT,
+            "이미 승인 대기 중인 작업물입니다."
     );
 
     private final HttpStatus status;

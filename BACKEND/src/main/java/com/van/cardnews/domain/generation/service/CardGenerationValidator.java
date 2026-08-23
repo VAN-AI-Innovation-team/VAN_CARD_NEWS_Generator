@@ -184,11 +184,84 @@ public class CardGenerationValidator {
             );
         }
 
+        JsonNode closingElements =
+                cards.path("closing")
+                        .path("elements");
+
         validateText(
                 "closing.cta",
                 result.closing().cta(),
-                20
+                getMaxCharsByContentField(
+                        closingElements,
+                        "cta",
+                        20
+                )
         );
+
+        // 최신 템플릿은 closing에도 image 요소가 있으므로 이미지 선택을 검증합니다.
+        if (hasContentFieldOrRole(closingElements, "image", "image")) {
+            if (result.closing().imageId() == null) {
+                throw new IllegalArgumentException(
+                        "closing에 이미지가 선택되지 않았습니다."
+                );
+            }
+        }
+    }
+
+    private static int getMaxCharsByContentField(
+            JsonNode elements,
+            String contentField,
+            int defaultMaxChars
+    ) {
+        if (!elements.isObject()) {
+            return defaultMaxChars;
+        }
+
+        var fields = elements.fields();
+
+        while (fields.hasNext()) {
+            var entry = fields.next();
+
+            if (contentField.equals(
+                    entry.getValue().path("contentField").asText(null)
+            )) {
+                JsonNode maxChars = entry.getValue().path("maxChars");
+
+                if (maxChars.isInt()) {
+                    return maxChars.asInt();
+                }
+
+                return defaultMaxChars;
+            }
+        }
+
+        return defaultMaxChars;
+    }
+
+    private static boolean hasContentFieldOrRole(
+            JsonNode elements,
+            String contentField,
+            String role
+    ) {
+        if (!elements.isObject()) {
+            return false;
+        }
+
+        var fields = elements.fields();
+
+        while (fields.hasNext()) {
+            var element = fields.next().getValue();
+
+            if (contentField.equals(
+                    element.path("contentField").asText(null)
+            ) || role.equals(
+                    element.path("role").asText(null)
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static int getMaxChars(

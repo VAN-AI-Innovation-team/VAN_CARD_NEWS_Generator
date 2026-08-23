@@ -5,61 +5,11 @@
   "canvasHeight": 1080,
   "layoutDefinition": {
     "type": "quote-center",
-    "description": "남색 배경 전체에 대형 따옴표 장식과 중앙 정렬 인용구, 하단 출처가 이미지 없이 배치된 텍스트 중심의 레이아웃입니다.",
+    "description": "짙은 남색 배경 전체에 대형 따옴표 장식, 중앙 정렬 인용구, 얇은 헤어라인 아래 출처가 배치된 텍스트 중심 레이아웃입니다.",
     "cards": {
       "cover": {
-        "elements": {
-          "background": {
-            "role": "background",
-            "x": 0,
-            "y": 0,
-            "width": 100,
-            "height": 100,
-            "colorToken": "primaryDark",
-            "layer": 0
-          },
-          "quoteMark": {
-            "role": "decoration",
-            "x": 10,
-            "y": 12,
-            "width": 20,
-            "height": 14,
-            "text": "“",
-            "colorToken": "accent",
-            "typographyToken": "quoteMark",
-            "layer": 3
-          },
-          "quoteText": {
-            "role": "body",
-            "x": 10,
-            "y": 30,
-            "width": 80,
-            "height": 45,
-            "maxChars": 90,
-            "align": "center",
-            "colorToken": "textOnDark",
-            "typographyToken": "quote",
-            "layer": 3
-          },
-          "source": {
-            "role": "footer",
-            "x": 10,
-            "y": 82,
-            "width": 80,
-            "height": 8,
-            "maxChars": 30,
-            "align": "center",
-            "colorToken": "accent",
-            "typographyToken": "footer",
-            "layer": 3
-          }
-        },
         "type": "quote-center",
-        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
-      },
-      "content": {
-        "type": "quote-center",
-        "description": "인용형 본문 반복 카드. 큰 따옴표 장식과 중앙 정렬 인용문, 하단 출처라는 기존 인용 템플릿의 핵심 구성을 반복합니다.",
+        "description": "템플릿별 대표 표지. quoteText는 title 필드, source는 highlight 필드에 바인딩되어 실제 생성된 인용문과 출처가 표시됩니다.",
         "elements": {
           "background": {
             "role": "background",
@@ -74,6 +24,65 @@
             "role": "decoration",
             "x": 10,
             "y": 10,
+            "width": 20,
+            "height": 13,
+            "text": "“",
+            "colorToken": "accent",
+            "typographyToken": "quoteMark",
+            "layer": 3
+          },
+          "quoteText": {
+            "role": "title",
+            "x": 10,
+            "y": 26,
+            "width": 80,
+            "height": 42,
+            "maxChars": 70,
+            "align": "center",
+            "colorToken": "textOnDark",
+            "typographyToken": "quote",
+            "layer": 3
+          },
+          "rule": {
+            "role": "divider",
+            "x": 40,
+            "y": 71,
+            "width": 20,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
+          },
+          "source": {
+            "role": "highlight",
+            "x": 10,
+            "y": 75,
+            "width": 80,
+            "height": 7,
+            "maxChars": 30,
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "footer",
+            "layer": 3
+          }
+        }
+      },
+      "content": {
+        "type": "quote-center",
+        "description": "인용형 본문 반복 카드. 대형 따옴표 장식과 중앙 정렬 인용문, 얇은 헤어라인 아래 출처를 배치합니다. (source는 highlight 필드에 바인딩되어 실제 생성된 출처 텍스트가 표시됩니다.)",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "quoteMark": {
+            "role": "decoration",
+            "x": 10,
+            "y": 9,
             "width": 18,
             "height": 10,
             "text": "“",
@@ -84,7 +93,7 @@
           "quoteText": {
             "role": "body",
             "x": 10,
-            "y": 24,
+            "y": 22,
             "width": 80,
             "height": 50,
             "maxChars": 110,
@@ -93,10 +102,19 @@
             "typographyToken": "quote",
             "layer": 3
           },
+          "rule": {
+            "role": "divider",
+            "x": 40,
+            "y": 75,
+            "width": 20,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
+          },
           "source": {
-            "role": "footer",
+            "role": "highlight",
             "x": 10,
-            "y": 84,
+            "y": 79,
             "width": 80,
             "height": 7,
             "maxChars": 30,
@@ -108,6 +126,8 @@
         }
       },
       "closing": {
+        "type": "brand-closing",
+        "description": "인용형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
         "elements": {
           "background": {
             "role": "background",
@@ -118,12 +138,21 @@
             "colorToken": "primaryDark",
             "layer": 0
           },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
           "brand": {
             "role": "eyebrow",
             "x": 10,
-            "y": 29,
+            "y": 28,
             "width": 80,
-            "height": 7,
+            "height": 6,
             "text": "VAN",
             "align": "center",
             "colorToken": "accent",
@@ -133,55 +162,103 @@
           "cta": {
             "role": "title",
             "x": 10,
-            "y": 43,
+            "y": 39,
             "width": 80,
-            "height": 18,
+            "height": 16,
             "maxChars": 20,
             "align": "center",
             "text": "VAN과 함께하기",
             "colorToken": "textOnDark",
             "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
             "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1080",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
           }
-        },
-        "type": "brand-closing",
-        "description": "인용형 브랜드 마무리 카드. 남색 배경과 VAN 연결 CTA로 카드 세트를 종료합니다."
+        }
       }
     }
   },
   "designTokens": {
     "colors": {
       "background": "#ffffff",
-      "surface": "#f4f6f9",
-      "primary": "#173d73",
-      "primaryDark": "#102a56",
-      "accent": "#315985",
-      "border": "#dce2ea",
-      "textPrimary": "#172033",
-      "textSecondary": "#68758a",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
       "textOnDark": "#ffffff",
-      "overlay": "rgba(16,42,86,0.55)"
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
     },
     "typography": {
       "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
-      "eyebrowSize": "22px",
+      "eyebrowSize": "24px",
       "eyebrowWeight": "700",
-      "eyebrowLetterSpacing": "1.5px",
-      "titleSize": "56px",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
       "titleWeight": "800",
-      "titleLineHeight": "1.25",
-      "bodySize": "32px",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
       "bodyWeight": "400",
-      "bodyLineHeight": "1.6",
-      "highlightSize": "30px",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
       "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
       "footerSize": "22px",
       "footerWeight": "500",
-      "quoteMarkSize": "120px",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
       "quoteMarkWeight": "800",
-      "quoteSize": "44px",
+      "quoteSize": "46px",
       "quoteWeight": "700",
-      "quoteLineHeight": "1.45"
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
     }
   }
 }

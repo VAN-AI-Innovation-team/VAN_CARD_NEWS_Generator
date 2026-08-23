@@ -30,6 +30,8 @@ export interface LayoutElement {
   typographyToken?: string;
   cropRatio?: string;
   shape?: string;
+  /** 템플릿이 실제 카드 데이터에서 값을 가져올 필드입니다. */
+  contentField?: 'title' | 'body' | 'highlight' | 'date' | 'location' | 'cta';
 }
 
 export interface LayoutCard {
@@ -72,6 +74,8 @@ export interface CardGenerationResult {
   cover: {
     title: string;
     highlight: string;
+    date?: string | null;
+    location?: string | null;
     imageId: number | null;
     cropArea: CropArea | null;
   };
@@ -80,12 +84,16 @@ export interface CardGenerationResult {
     title: string;
     body: string;
     highlight: string;
+    date?: string | null;
+    location?: string | null;
     imageId: number | null;
     cropArea: CropArea | null;
   }>;
 
   closing: {
     cta: string;
+    imageId: number | null;
+    cropArea: CropArea | null;
   };
 }
 
@@ -96,11 +104,22 @@ export interface PreviewImage {
   sortOrder: number;
 }
 
+export interface GeneratedCardImageResponse {
+  id: number;
+  cardType: 'COVER' | 'CONTENT' | 'CLOSING';
+  cardIndex: number;
+  sortOrder: number;
+  imageUrl: string;
+  width: number | null;
+  height: number | null;
+}
+
 export interface ContentPreviewResponse {
   contentId: number;
   title: string;
   body: string;
   status: string;
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   template: PreviewTemplate;
   cardGenerationResult: CardGenerationResult | null;
   images: PreviewImage[];
@@ -196,4 +215,31 @@ export interface CardImagePlacement {
     width: number;
     height: number;
   };
+}
+
+export async function generateCardImages(
+  contentId: number,
+): Promise<GeneratedCardImageResponse[]> {
+  const response = await axios.post<GeneratedCardImageResponse[]>(
+    `/api/contents/${contentId}/generated-images/generate`,
+  );
+
+  return response.data;
+}
+
+export async function requestContentApproval(
+  contentId: number,
+): Promise<ApprovalRequestResponse> {
+  const response = await axios.post<ApprovalRequestResponse>(
+    `/api/contents/${contentId}/approval-requests`,
+  );
+
+  return response.data;
+}
+
+export interface ApprovalRequestResponse {
+  approvalRequestId: number;
+  contentId: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
 }

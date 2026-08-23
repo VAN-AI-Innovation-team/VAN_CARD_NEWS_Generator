@@ -5,6 +5,7 @@ import { TemplateProvider, useTemplate } from './contexts/TemplateContext';
 
 import { TemplateSelector } from './components/TemplateSelector/TemplateSelector';
 import CardNewsEditor from './components/CardNewsPreview/CardNewsEditor';
+import ContentResult from './components/ContentResult/ContentResult';
 import PostInputForm, {
   type PostInputFormSubmitPayload,
 } from './components/PostForm/PostInputForm';
@@ -18,12 +19,14 @@ import type { ContentType } from './types/content';
 import {
   createContent,
   fetchContentPreview,
+  generateCardImages,
+  type GeneratedCardImageResponse,
   type ContentPreviewResponse,
 } from './api/contentApi';
 
 import './App.css';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const PREVIEW_POLL_INTERVAL = 1000;
 const PREVIEW_POLL_MAX_COUNT = 30;
@@ -53,6 +56,14 @@ function AppContent() {
   const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
 
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const [generatedImages, setGeneratedImages] = useState<
+    GeneratedCardImageResponse[]
+  >([]);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [generationImageError, setGenerationImageError] = useState<
+    string | null
+  >(null);
 
   const { selectedTemplateId, clearSelectedTemplate } = useTemplate();
 
@@ -131,6 +142,8 @@ function AppContent() {
       const previewData = await waitForPreview(response.contentId);
 
       setPreview(previewData);
+      setGeneratedImages([]);
+      setGenerationImageError(null);
       setStep(4);
     } catch (error) {
       console.error('카드뉴스 생성/미리보기 실패:', error);
@@ -142,6 +155,30 @@ function AppContent() {
       );
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleGenerateCardImages(
+    updatedPreview: ContentPreviewResponse,
+  ) {
+    try {
+      setPreview(updatedPreview);
+      setGenerationImageError(null);
+      setGeneratedImages([]);
+      setIsGeneratingImages(true);
+      setStep(5);
+
+      const images = await generateCardImages(updatedPreview.contentId);
+      setGeneratedImages(images);
+    } catch (error) {
+      console.error('Higgsfield 카드 이미지 생성 실패:', error);
+      setGenerationImageError(
+        error instanceof Error
+          ? error.message
+          : '카드뉴스 이미지 생성 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setIsGeneratingImages(false);
     }
   }
 
@@ -158,6 +195,11 @@ function AppContent() {
 
     if (step === 4) {
       setStep(3);
+      return;
+    }
+
+    if (step === 5) {
+      setStep(4);
     }
   }
 
@@ -172,6 +214,8 @@ function AppContent() {
     setPostData(null);
     setPreview(null);
     setPreviewError(null);
+    setGeneratedImages([]);
+    setGenerationImageError(null);
     clearSelectedTemplate();
   }
 
@@ -280,13 +324,29 @@ function AppContent() {
 
           <span className="step-navigation__line" />
 
-          <div className={`step-item ${step >= 4 ? 'step-item--active' : ''}`}>
+          <div
+            className={`step-item ${step >= 4 ? 'step-item--active' : ''} ${
+              step > 4 ? 'step-item--completed' : ''
+            }`}
+          >
             <span className="step-item__number">04</span>
 
             <div className="step-item__content">
-              <span className="step-item__label">미리보기</span>
+              <span className="step-item__label">카드 구성 확인</span>
 
-              <span className="step-item__description">생성 결과 확인</span>
+              <span className="step-item__description">카드 내용 수정</span>
+            </div>
+          </div>
+
+          <span className="step-navigation__line" />
+
+          <div className={`step-item ${step >= 5 ? 'step-item--active' : ''}`}>
+            <span className="step-item__number">05</span>
+
+            <div className="step-item__content">
+              <span className="step-item__label">생성 결과</span>
+
+              <span className="step-item__description">최종 결과 확인</span>
             </div>
           </div>
         </nav>
@@ -412,7 +472,7 @@ function AppContent() {
                       disabled={!isPostDataValid || !selectedTemplateId}
                       onClick={handleCreateContent}
                     >
-                      카드뉴스 만들기
+                      카드 구성 확인
                     </button>
                   </div>
                 </>
@@ -423,18 +483,25 @@ function AppContent() {
           {step === 4 && preview && preview.cardGenerationResult && (
             <div className="workflow-step">
               <div className="workflow-step__header">
-                <p className="workflow-step__eyebrow">STEP 04 · PREVIEW</p>
+                <p className="workflow-step__eyebrow">
+                  STEP 04 · CARD COMPOSITION
+                </p>
 
                 <h3 className="workflow-step__title">
-                  생성된 카드뉴스를 확인해주세요.
+                  생성된 카드 구성을 확인해주세요.
                 </h3>
 
                 <p className="workflow-step__description">
-                  카드별 문구를 확인하고 필요한 내용을 수정할 수 있습니다.
+                  카드별 문구와 이미지를 확인하고 필요한 내용을 수정한 후
+                  카드뉴스를 생성합니다.
                 </p>
               </div>
 
-              <CardNewsEditor preview={preview} onUpdated={setPreview} />
+              <CardNewsEditor
+                preview={preview}
+                onUpdated={setPreview}
+                onGenerate={handleGenerateCardImages}
+              />
 
               <div className="workflow-navigation">
                 <button
@@ -445,13 +512,50 @@ function AppContent() {
                   <span aria-hidden="true">←</span>
                   템플릿 수정
                 </button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && preview && (
+            <div className="workflow-step">
+              <div className="workflow-step__header">
+                <p className="workflow-step__eyebrow">STEP 05 · RESULT</p>
+
+                <h3 className="workflow-step__title">
+                  생성된 카드뉴스를 확인해주세요.
+                </h3>
+
+                <p className="workflow-step__description">
+                  생성된 최종 카드 이미지를 확인하고 승인 요청을 진행할 수
+                  있습니다.
+                </p>
+              </div>
+
+              <ContentResult
+                preview={preview}
+                images={generatedImages}
+                isLoading={isGeneratingImages}
+                error={generationImageError}
+              />
+
+              <div className="workflow-navigation">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handlePreviousStep}
+                  disabled={isGeneratingImages}
+                >
+                  <span aria-hidden="true">←</span>
+                  카드 구성 수정
+                </button>
 
                 <button
                   type="button"
                   className="primary-button"
                   onClick={handleStartNewContent}
+                  disabled={isGeneratingImages}
                 >
-                  카드뉴스 만들기
+                  새 카드뉴스 만들기
                 </button>
               </div>
             </div>

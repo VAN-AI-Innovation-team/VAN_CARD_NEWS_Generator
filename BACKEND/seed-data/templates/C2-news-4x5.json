@@ -5,27 +5,30 @@
   "canvasHeight": 1350,
   "layoutDefinition": {
     "type": "image-headline-text",
-    "description": "상단 영역의 소형 이미지와 하단의 텍스트 영역이 구분되어 배치된 레이아웃입니다.",
+    "description": "상단 소형 사진과 하단 텍스트 영역이 구분된 구조로, 저널 느낌의 카테고리 라벨과 헤드라인을 이어 배치했습니다.",
     "cards": {
       "cover": {
+        "type": "image-headline-text",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다.",
         "elements": {
           "image": {
             "role": "image",
             "x": 0,
             "y": 0,
             "width": 100,
-            "height": 30,
+            "height": 32,
             "cropRatio": "16:9",
             "layer": 1
           },
           "categoryLabel": {
             "role": "eyebrow",
             "x": 8,
-            "y": 34,
+            "y": 36,
             "width": 50,
             "height": 4,
             "maxChars": 10,
             "align": "left",
+            "text": "VAN NEWS",
             "colorToken": "primary",
             "typographyToken": "eyebrow",
             "layer": 3
@@ -33,13 +36,22 @@
           "title": {
             "role": "title",
             "x": 8,
-            "y": 39,
+            "y": 41,
             "width": 84,
             "height": 22,
             "maxChars": 45,
             "align": "left",
             "colorToken": "textPrimary",
             "typographyToken": "title",
+            "layer": 3
+          },
+          "divider": {
+            "role": "divider",
+            "x": 8,
+            "y": 66,
+            "width": 16,
+            "height": 0.35,
+            "colorToken": "accentLine",
             "layer": 3
           },
           "footer": {
@@ -55,32 +67,30 @@
             "typographyToken": "footer",
             "layer": 3
           }
-        },
-        "type": "image-headline-text",
-        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
+        }
       },
       "content": {
         "type": "headline-text",
-        "description": "소식형 본문 반복 카드. 카테고리 라벨·헤드라인·구분선의 기존 소식형 시각 언어를 유지하면서 긴 본문을 카드 단위로 나눠 전달합니다.",
+        "description": "소식형 본문 반복 카드. 상단 킥커 룰과 카테고리 라벨, 얇은 중간 구분선으로 이어지는 저널형 시각 언어를 유지합니다.",
         "elements": {
-          "accentBand": {
-            "role": "background",
-            "kind": "stripe",
-            "x": 0,
-            "y": 4,
-            "width": 100,
-            "height": 1,
+          "topRule": {
+            "role": "divider",
+            "x": 8,
+            "y": 5,
+            "width": 14,
+            "height": 0.4,
             "colorToken": "primary",
-            "layer": 0
+            "layer": 2
           },
           "categoryLabel": {
             "role": "eyebrow",
             "x": 8,
             "y": 9,
             "width": 50,
-            "height": 6,
+            "height": 5,
             "maxChars": 10,
             "align": "left",
+            "text": "VAN NEWS",
             "colorToken": "primary",
             "typographyToken": "eyebrow",
             "layer": 3
@@ -88,9 +98,9 @@
           "title": {
             "role": "title",
             "x": 8,
-            "y": 18,
+            "y": 16,
             "width": 84,
-            "height": 18,
+            "height": 20,
             "maxChars": 38,
             "align": "left",
             "colorToken": "textPrimary",
@@ -101,9 +111,9 @@
             "role": "divider",
             "x": 8,
             "y": 39,
-            "width": 20,
-            "height": 0.5,
-            "colorToken": "accent",
+            "width": 16,
+            "height": 0.35,
+            "colorToken": "accentLine",
             "layer": 3
           },
           "body": {
@@ -134,6 +144,8 @@
         }
       },
       "closing": {
+        "type": "brand-closing",
+        "description": "소식형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
         "elements": {
           "background": {
             "role": "background",
@@ -144,12 +156,21 @@
             "colorToken": "primaryDark",
             "layer": 0
           },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
           "brand": {
             "role": "eyebrow",
             "x": 10,
-            "y": 29,
+            "y": 28,
             "width": 80,
-            "height": 7,
+            "height": 6,
             "text": "VAN",
             "align": "center",
             "colorToken": "accent",
@@ -159,55 +180,103 @@
           "cta": {
             "role": "title",
             "x": 10,
-            "y": 43,
+            "y": 39,
             "width": 80,
-            "height": 18,
+            "height": 16,
             "maxChars": 20,
             "align": "center",
             "text": "자세히 보기",
             "colorToken": "textOnDark",
             "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
             "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
           }
-        },
-        "type": "brand-closing",
-        "description": "소식형 브랜드 마무리 카드. 남색 배경과 후속 확인 CTA로 카드 세트를 종료합니다."
+        }
       }
     }
   },
   "designTokens": {
     "colors": {
       "background": "#ffffff",
-      "surface": "#f4f6f9",
-      "primary": "#173d73",
-      "primaryDark": "#102a56",
-      "accent": "#315985",
-      "border": "#dce2ea",
-      "textPrimary": "#172033",
-      "textSecondary": "#68758a",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
       "textOnDark": "#ffffff",
-      "overlay": "rgba(16,42,86,0.55)"
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
     },
     "typography": {
       "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
-      "eyebrowSize": "22px",
+      "eyebrowSize": "24px",
       "eyebrowWeight": "700",
-      "eyebrowLetterSpacing": "1.5px",
-      "titleSize": "56px",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
       "titleWeight": "800",
-      "titleLineHeight": "1.25",
-      "bodySize": "32px",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
       "bodyWeight": "400",
-      "bodyLineHeight": "1.6",
-      "highlightSize": "30px",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
       "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
       "footerSize": "22px",
       "footerWeight": "500",
-      "quoteMarkSize": "120px",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
       "quoteMarkWeight": "800",
-      "quoteSize": "44px",
+      "quoteSize": "46px",
       "quoteWeight": "700",
-      "quoteLineHeight": "1.45"
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
     }
   }
 }

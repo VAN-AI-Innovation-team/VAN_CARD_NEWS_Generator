@@ -25,9 +25,9 @@ RUN addgroup --system spring \
 
 COPY --from=builder /web/build/libs/*.jar web.jar
 
-# 애플리케이션 파일 및 업로드 디렉터리 권한 설정
-RUN mkdir -p /app/uploads \
-    && chown -R spring:spring /app/uploads \
+# 애플리케이션 파일 및 업로드/생성 디렉터리 권한 설정
+RUN mkdir -p /app/uploads /app/generated \
+    && chown -R spring:spring /app/uploads /app/generated \
     && chown spring:spring /web/web.jar
 
 USER spring:spring

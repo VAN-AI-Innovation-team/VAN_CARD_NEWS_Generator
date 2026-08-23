@@ -1,5 +1,6 @@
 .app {
   min-height: 100vh;
+  overflow-x: hidden;
   background: #f4f6f9;
   color: #172033;
 }
@@ -585,4 +586,47 @@
 
   font-size: 12px;
   line-height: 1.7;
+}
+
+@media (max-width: 480px) {
+  .app-header__inner {
+    width: calc(100% - 24px);
+    gap: 12px;
+  }
+
+  .app-main {
+    width: calc(100% - 24px);
+    padding: 24px 0 44px;
+  }
+
+  .workflow-step {
+    padding: 22px 14px;
+  }
+
+  .workflow-navigation {
+    flex-wrap: wrap;
+  }
+
+  .workflow-navigation > * {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+
+  .creation-state {
+    min-height: 320px;
+    padding: 32px 16px;
+  }
+
+  .creation-state__actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .creation-state__actions > * {
+    width: 100%;
+  }
+
+  .app-footer {
+    width: calc(100% - 24px);
+  }
 }

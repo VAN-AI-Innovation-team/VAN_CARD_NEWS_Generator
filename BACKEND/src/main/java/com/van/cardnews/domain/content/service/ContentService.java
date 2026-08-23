@@ -11,6 +11,7 @@ import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentImage;
 import com.van.cardnews.domain.content.repository.ContentRepository;
+import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import com.van.cardnews.domain.generation.service.CardGenerationValidator;
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
@@ -45,6 +46,7 @@ public class ContentService {
     private final CardGenerationValidator cardGenerationValidator;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final ApprovalRequestRepository approvalRequestRepository;
 
     @Transactional
     public ContentCreateResponse createContent(
@@ -119,7 +121,10 @@ public class ContentService {
                                 )
                         );
 
-        return ContentPreviewResponse.from(content);
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
     }
 
     @Transactional
@@ -158,7 +163,10 @@ public class ContentService {
                 request.cardGenerationResult()
         );
 
-        return ContentPreviewResponse.from(content);
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
     }
 
     @Transactional
@@ -252,7 +260,10 @@ public class ContentService {
                 placements
         );
 
-        return ContentPreviewResponse.from(content);
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
     }
 
     private void validateImageCount(
