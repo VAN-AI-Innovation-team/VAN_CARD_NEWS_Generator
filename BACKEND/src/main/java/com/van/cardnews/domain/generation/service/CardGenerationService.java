@@ -157,6 +157,16 @@ public class CardGenerationService {
                     "content[" + i + "]"
             );
         }
+
+        // closing에 이미지 요소가 있는 최신 템플릿에서는
+        // 마무리 카드도 실제 ContentImage를 참조해야 합니다.
+        if (result.closing() != null) {
+            validateImageId(
+                    result.closing().imageId(),
+                    imageIds,
+                    "closing"
+            );
+        }
     }
 
     private void validateImageId(

@@ -11,6 +11,8 @@ public record CardGenerationResult(
     public record CoverContent(
             String title,
             String highlight,
+            String date,
+            String location,
             Long imageId,
             CropArea cropArea
     ) {
@@ -20,13 +22,17 @@ public record CardGenerationResult(
             String title,
             String body,
             String highlight,
+            String date,
+            String location,
             Long imageId,
             CropArea cropArea
     ) {
     }
 
     public record ClosingContent(
-            String cta
+            String cta,
+            Long imageId,
+            CropArea cropArea
     ) {
     }
 

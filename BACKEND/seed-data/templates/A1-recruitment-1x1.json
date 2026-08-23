@@ -5,9 +5,11 @@
   "canvasHeight": 1080,
   "layoutDefinition": {
     "type": "image-overlay-bottom",
-    "description": "상단~중단에 전체 이미지를 배치하고, 하단에 남색 반투명 오버레이를 깔아 그 위에 흰색 텍스트로 제목과 지원 안내 문구를 배치한 구조입니다.",
+    "description": "전면 사진 위에 짙은 남색 그라데이션 톤의 오버레이를 깔고, 얇은 헤어라인과 화이트 필 배지로 마무리한 포스터형 표지 구조입니다.",
     "cards": {
       "cover": {
+        "type": "image-overlay-bottom",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다.",
         "elements": {
           "image": {
             "role": "image",
@@ -15,24 +17,33 @@
             "y": 0,
             "width": 100,
             "height": 100,
-            "cropRatio": "1:1",
+            "cropRatio": "4:5",
             "layer": 1
           },
           "overlay": {
             "role": "overlay",
             "x": 0,
-            "y": 62,
+            "y": 56,
             "width": 100,
-            "height": 38,
+            "height": 44,
             "colorToken": "overlay",
             "layer": 2
+          },
+          "rule": {
+            "role": "divider",
+            "x": 7,
+            "y": 62,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 3
           },
           "eyebrow": {
             "role": "eyebrow",
             "x": 7,
-            "y": 67,
+            "y": 65,
             "width": 86,
-            "height": 6,
+            "height": 5,
             "text": "MEMBER RECRUITMENT",
             "colorToken": "textOnDark",
             "typographyToken": "eyebrow",
@@ -41,9 +52,9 @@
           "title": {
             "role": "title",
             "x": 7,
-            "y": 74,
+            "y": 72,
             "width": 86,
-            "height": 16,
+            "height": 17,
             "maxChars": 26,
             "align": "left",
             "colorToken": "textOnDark",
@@ -53,48 +64,55 @@
           "highlight": {
             "role": "highlight",
             "x": 7,
-            "y": 90,
-            "width": 50,
-            "height": 7,
+            "y": 91,
+            "width": 48,
+            "height": 6.5,
             "maxChars": 18,
             "align": "center",
-            "shape": "badge",
-            "colorToken": "primary",
+            "shape": "pill",
+            "colorToken": "primaryDark",
             "backgroundToken": "textOnDark",
             "typographyToken": "highlight",
             "layer": 3
           }
-        },
-        "type": "image-overlay-bottom",
-        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
+        }
       },
       "content": {
         "type": "image-highlight-body",
-        "description": "모집형 본문 반복 카드. 모집 템플릿의 이미지 중심 구성과 강조 배지 특성을 유지하면서 본문을 카드 단위로 반복 배치합니다.",
+        "description": "모집형 본문 반복 카드. 사진과 아이보리 패널을 결합하고, 얇은 포인트 룰과 필(pill) 형태 강조 배지로 절제된 위계를 만듭니다.",
         "elements": {
           "image": {
             "role": "image",
             "x": 0,
             "y": 0,
             "width": 100,
-            "height": 48,
+            "height": 46,
             "cropRatio": "4:3",
             "layer": 1
           },
           "panel": {
             "role": "panel",
             "x": 0,
-            "y": 48,
+            "y": 46,
             "width": 100,
-            "height": 52,
-            "colorToken": "background",
+            "height": 54,
+            "colorToken": "surface",
             "layer": 2
+          },
+          "rule": {
+            "role": "divider",
+            "x": 7,
+            "y": 50,
+            "width": 10,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
           },
           "sectionLabel": {
             "role": "eyebrow",
             "x": 7,
-            "y": 54,
-            "width": 50,
+            "y": 53,
+            "width": 60,
             "height": 5,
             "text": "MEMBER RECRUITMENT",
             "maxChars": 22,
@@ -106,9 +124,9 @@
           "title": {
             "role": "title",
             "x": 7,
-            "y": 62,
+            "y": 60,
             "width": 86,
-            "height": 14,
+            "height": 15,
             "maxChars": 28,
             "align": "left",
             "colorToken": "textPrimary",
@@ -131,11 +149,11 @@
             "role": "highlight",
             "x": 7,
             "y": 94,
-            "width": 50,
-            "height": 4,
+            "width": 48,
+            "height": 5,
             "maxChars": 18,
             "align": "center",
-            "shape": "badge",
+            "shape": "pill",
             "colorToken": "textOnDark",
             "backgroundToken": "primary",
             "typographyToken": "highlight",
@@ -144,6 +162,8 @@
         }
       },
       "closing": {
+        "type": "brand-closing",
+        "description": "모집형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
         "elements": {
           "background": {
             "role": "background",
@@ -154,12 +174,21 @@
             "colorToken": "primaryDark",
             "layer": 0
           },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
           "brand": {
             "role": "eyebrow",
             "x": 10,
-            "y": 29,
+            "y": 28,
             "width": 80,
-            "height": 7,
+            "height": 6,
             "text": "VAN",
             "align": "center",
             "colorToken": "accent",
@@ -169,55 +198,103 @@
           "cta": {
             "role": "title",
             "x": 10,
-            "y": 43,
+            "y": 39,
             "width": 80,
-            "height": 18,
+            "height": 16,
             "maxChars": 20,
             "align": "center",
             "text": "지금 지원하기",
             "colorToken": "textOnDark",
             "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
             "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1080",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
           }
-        },
-        "type": "brand-closing",
-        "description": "모집형 브랜드 마무리 카드. 남색 배경과 지원 CTA로 카드 세트를 종료합니다."
+        }
       }
     }
   },
   "designTokens": {
     "colors": {
       "background": "#ffffff",
-      "surface": "#f4f6f9",
-      "primary": "#173d73",
-      "primaryDark": "#102a56",
-      "accent": "#315985",
-      "border": "#dce2ea",
-      "textPrimary": "#172033",
-      "textSecondary": "#68758a",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
       "textOnDark": "#ffffff",
-      "overlay": "rgba(16,42,86,0.55)"
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
     },
     "typography": {
       "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
-      "eyebrowSize": "22px",
+      "eyebrowSize": "24px",
       "eyebrowWeight": "700",
-      "eyebrowLetterSpacing": "1.5px",
-      "titleSize": "56px",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
       "titleWeight": "800",
-      "titleLineHeight": "1.25",
-      "bodySize": "32px",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
       "bodyWeight": "400",
-      "bodyLineHeight": "1.6",
-      "highlightSize": "30px",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
       "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
       "footerSize": "22px",
       "footerWeight": "500",
-      "quoteMarkSize": "120px",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
       "quoteMarkWeight": "800",
-      "quoteSize": "44px",
+      "quoteSize": "46px",
       "quoteWeight": "700",
-      "quoteLineHeight": "1.45"
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
     }
   }
 }

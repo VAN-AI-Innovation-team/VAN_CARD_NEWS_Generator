@@ -2,6 +2,7 @@
   position: relative;
   width: 100%;
   max-width: 540px;
+  min-width: 0;
   overflow: hidden;
   background: #ffffff;
   font-family:
@@ -9,11 +10,20 @@
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
+
+  /*
+   * 카드 내부의 모든 폰트 크기/자간은 cqw(컨테이너 폭 대비 %) 단위로 지정됩니다.
+   * container-type을 선언해야 cqw가 이 요소의 실제 렌더링 폭을 기준으로 계산되며,
+   * 카드가 목록에서 작게 보이든 상세보기에서 크게 보이든 항상 같은 비율로
+   * 스케일됩니다.
+   */
+  container-type: inline-size;
 }
 
 .card-news-preview__element {
   position: absolute;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .card-news-preview__image {
@@ -21,6 +31,10 @@
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.card-news-preview__shape {
+  pointer-events: none;
 }
 
 .card-news-preview__text {
@@ -31,23 +45,25 @@
   overflow: hidden;
 }
 
+/* 아래 크기값은 typographyToken이 지정되지 않았을 때만 쓰이는 기본값입니다. */
+
 .card-news-preview__text--eyebrow {
   align-items: center;
-  font-size: 2.2%;
+  font-size: 2.2cqw;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
 .card-news-preview__text--title {
   align-items: center;
-  font-size: 5.2%;
+  font-size: 5.2cqw;
   line-height: 1.25;
   font-weight: 800;
 }
 
 .card-news-preview__text--body {
   align-items: flex-start;
-  font-size: 3%;
+  font-size: 3cqw;
   line-height: 1.6;
   font-weight: 400;
 }
@@ -55,7 +71,30 @@
 .card-news-preview__text--highlight {
   align-items: center;
   justify-content: center;
-  font-size: 2.8%;
+  font-size: 2.8cqw;
   line-height: 1.2;
   font-weight: 700;
+}
+
+.card-news-preview__text--badge {
+  align-items: center;
+  justify-content: center;
+  font-size: 2cqw;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.card-news-preview__text--footer {
+  align-items: center;
+  font-size: 2cqw;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.card-news-preview__text--decoration {
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1;
+  font-weight: 800;
 }

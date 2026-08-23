@@ -5,37 +5,50 @@
   "canvasHeight": 1350,
   "layoutDefinition": {
     "type": "badge-image-title-body",
-    "description": "세로로 확장된 카드형 구조에 상단 날짜 배지, 중앙 이미지, 하단 제목 및 장소를 순서대로 배치하고 행사 설명 본문을 추가로 구성한 레이아웃입니다.",
+    "description": "세로로 확장된 구조에서 필 형태 날짜 배지, 사진, 헤어라인, 제목·장소를 순서대로 배치한 행사 안내 레이아웃입니다.",
     "cards": {
       "cover": {
+        "type": "badge-image-title-body",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다.",
         "elements": {
           "dateBadge": {
             "role": "badge",
             "x": 7,
             "y": 5,
-            "width": 38,
-            "height": 7,
+            "width": 32,
+            "height": 6,
             "maxChars": 16,
             "align": "center",
-            "shape": "badge",
+            "shape": "pill",
+            "text": "xxxx.xx.xx",
             "colorToken": "textOnDark",
             "backgroundToken": "primary",
-            "typographyToken": "eyebrow",
-            "layer": 3
+            "typographyToken": "badge",
+            "layer": 3,
+            "contentField": "date"
           },
           "image": {
             "role": "image",
             "x": 0,
-            "y": 14,
+            "y": 13,
             "width": 100,
-            "height": 46,
+            "height": 44,
             "cropRatio": "4:3",
             "layer": 1
+          },
+          "rule": {
+            "role": "divider",
+            "x": 7,
+            "y": 60,
+            "width": 9,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
           },
           "title": {
             "role": "title",
             "x": 7,
-            "y": 63,
+            "y": 64,
             "width": 86,
             "height": 13,
             "maxChars": 24,
@@ -47,53 +60,54 @@
           "location": {
             "role": "footer",
             "x": 7,
-            "y": 91,
+            "y": 90,
             "width": 86,
             "height": 6,
             "maxChars": 30,
             "align": "left",
+            "text": "장소를 넣어주세요",
             "colorToken": "textSecondary",
             "typographyToken": "footer",
-            "layer": 3
+            "layer": 3,
+            "contentField": "location"
           }
-        },
-        "type": "badge-image-title-body",
-        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다."
+        }
       },
       "content": {
         "type": "event-detail",
-        "description": "행사형 본문 반복 카드. 날짜 배지와 행사 정보의 계층을 유지하고 제목·본문·장소를 카드 단위로 반복 배치합니다.",
+        "description": "행사형 본문 반복 카드. 필 형태 날짜 배지와 얇은 헤어라인으로 정보 위계를 정리하고, 제목·본문·장소를 카드 단위로 반복합니다.",
         "elements": {
           "dateBadge": {
             "role": "badge",
             "x": 7,
             "y": 6,
-            "width": 38,
-            "height": 8,
+            "width": 34,
+            "height": 6.5,
             "maxChars": 16,
             "align": "center",
-            "shape": "badge",
+            "shape": "pill",
+            "text": "xxxx.xx.xx",
             "colorToken": "textOnDark",
             "backgroundToken": "primary",
-            "typographyToken": "eyebrow",
-            "layer": 3
+            "typographyToken": "badge",
+            "layer": 3,
+            "contentField": "date"
           },
-          "accentBand": {
-            "role": "background",
-            "kind": "stripe",
+          "rule": {
+            "role": "divider",
             "x": 7,
-            "y": 17,
+            "y": 16,
             "width": 86,
-            "height": 1,
-            "colorToken": "accent",
+            "height": 0.3,
+            "colorToken": "accentLine",
             "layer": 2
           },
           "title": {
             "role": "title",
             "x": 7,
-            "y": 23,
+            "y": 22,
             "width": 86,
-            "height": 18,
+            "height": 17,
             "maxChars": 30,
             "align": "left",
             "colorToken": "textPrimary",
@@ -103,9 +117,9 @@
           "body": {
             "role": "body",
             "x": 7,
-            "y": 44,
+            "y": 42,
             "width": 86,
-            "height": 30,
+            "height": 32,
             "maxChars": 150,
             "align": "left",
             "colorToken": "textSecondary",
@@ -120,13 +134,17 @@
             "height": 6,
             "maxChars": 30,
             "align": "left",
+            "text": "장소를 넣어주세요",
             "colorToken": "textSecondary",
             "typographyToken": "footer",
-            "layer": 3
+            "layer": 3,
+            "contentField": "location"
           }
         }
       },
       "closing": {
+        "type": "brand-closing",
+        "description": "행사형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
         "elements": {
           "background": {
             "role": "background",
@@ -137,12 +155,21 @@
             "colorToken": "primaryDark",
             "layer": 0
           },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
           "brand": {
             "role": "eyebrow",
             "x": 10,
-            "y": 29,
+            "y": 28,
             "width": 80,
-            "height": 7,
+            "height": 6,
             "text": "VAN",
             "align": "center",
             "colorToken": "accent",
@@ -152,55 +179,103 @@
           "cta": {
             "role": "title",
             "x": 10,
-            "y": 43,
+            "y": 39,
             "width": 80,
-            "height": 18,
+            "height": 16,
             "maxChars": 20,
             "align": "center",
             "text": "참가 신청하기",
             "colorToken": "textOnDark",
             "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
             "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
           }
-        },
-        "type": "brand-closing",
-        "description": "행사형 브랜드 마무리 카드. 남색 배경과 참가 신청 CTA로 카드 세트를 종료합니다."
+        }
       }
     }
   },
   "designTokens": {
     "colors": {
       "background": "#ffffff",
-      "surface": "#f4f6f9",
-      "primary": "#173d73",
-      "primaryDark": "#102a56",
-      "accent": "#315985",
-      "border": "#dce2ea",
-      "textPrimary": "#172033",
-      "textSecondary": "#68758a",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
       "textOnDark": "#ffffff",
-      "overlay": "rgba(16,42,86,0.55)"
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
     },
     "typography": {
       "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
-      "eyebrowSize": "22px",
+      "eyebrowSize": "24px",
       "eyebrowWeight": "700",
-      "eyebrowLetterSpacing": "1.5px",
-      "titleSize": "56px",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
       "titleWeight": "800",
-      "titleLineHeight": "1.25",
-      "bodySize": "32px",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
       "bodyWeight": "400",
-      "bodyLineHeight": "1.6",
-      "highlightSize": "30px",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
       "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
       "footerSize": "22px",
       "footerWeight": "500",
-      "quoteMarkSize": "120px",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
       "quoteMarkWeight": "800",
-      "quoteSize": "44px",
+      "quoteSize": "46px",
       "quoteWeight": "700",
-      "quoteLineHeight": "1.45"
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
     }
   }
 }

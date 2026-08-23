@@ -14,6 +14,7 @@ import './CardNewsEditor.css';
 interface CardNewsEditorProps {
   preview: ContentPreviewResponse;
   onUpdated: (preview: ContentPreviewResponse) => void;
+  onGenerate: (preview: ContentPreviewResponse) => Promise<void>;
 }
 
 type EditableCard =
@@ -35,6 +36,8 @@ function cloneResult(result: CardGenerationResult): CardGenerationResult {
 
     closing: {
       ...result.closing,
+      imageId: result.closing.imageId ?? null,
+      cropArea: result.closing.cropArea ? { ...result.closing.cropArea } : null,
     },
   };
 }
@@ -44,6 +47,8 @@ function createEmptyContentCard(): CardGenerationResult['content'][number] {
     title: '새 카드 제목',
     body: '새 카드 내용을 입력해주세요.',
     highlight: '',
+    date: null,
+    location: null,
     imageId: null,
     cropArea: null,
   };
@@ -52,6 +57,7 @@ function createEmptyContentCard(): CardGenerationResult['content'][number] {
 export default function CardNewsEditor({
   preview,
   onUpdated,
+  onGenerate,
 }: CardNewsEditorProps) {
   const [result, setResult] = useState<CardGenerationResult | null>(
     preview.cardGenerationResult
@@ -62,6 +68,7 @@ export default function CardNewsEditor({
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -90,6 +97,26 @@ export default function CardNewsEditor({
 
     return result.closing;
   }, [result, selectedCardIndex]);
+
+  function getSelectedLayoutCard() {
+    if (selectedCardIndex === 0) {
+      return preview.template.layout.cards.cover;
+    }
+
+    if (selectedCardIndex <= (result?.content.length ?? 0)) {
+      return preview.template.layout.cards.content;
+    }
+
+    return preview.template.layout.cards.closing;
+  }
+
+  function usesContentField(field: 'date' | 'location' | 'cta'): boolean {
+    const elements = getSelectedLayoutCard().elements;
+
+    return Object.values(elements).some(
+      (element) => element.contentField === field,
+    );
+  }
 
   function updateSelectedCard(field: string, value: string) {
     setResult((current) => {
@@ -152,7 +179,9 @@ export default function CardNewsEditor({
         return next;
       }
 
-      // Closing에는 이미지가 없으므로 무시
+      next.closing.imageId = imageId;
+      next.closing.cropArea = null;
+
       return next;
     });
   }
@@ -168,6 +197,14 @@ export default function CardNewsEditor({
 
     if (field === 'highlight' && 'highlight' in card) {
       return card.highlight ?? '';
+    }
+
+    if (field === 'date' && 'date' in card) {
+      return card.date ?? '';
+    }
+
+    if (field === 'location' && 'location' in card) {
+      return card.location ?? '';
     }
 
     if (field === 'cta' && 'cta' in card) {
@@ -290,6 +327,35 @@ export default function CardNewsEditor({
       setError('수정 내용을 저장하지 못했습니다.');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!result || isSaving || isGenerating) {
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const updatedPreview = await updateContentPreview(
+        preview.contentId,
+        result,
+      );
+
+      onUpdated(updatedPreview);
+      await onGenerate(updatedPreview);
+    } catch (generateError) {
+      console.error('카드뉴스 생성 요청 실패:', generateError);
+      setError(
+        generateError instanceof Error
+          ? generateError.message
+          : '카드뉴스 생성 요청에 실패했습니다.',
+      );
+    } finally {
+      setIsGenerating(false);
     }
   }
 
@@ -438,7 +504,37 @@ export default function CardNewsEditor({
             </label>
           )}
 
-          {'cta' in selectedCard && (
+          {usesContentField('date') && 'date' in selectedCard && (
+            <label className="card-news-editor__field">
+              <span>날짜</span>
+
+              <input
+                type="text"
+                placeholder="xxxx.xx.xx"
+                value={getFieldValue(selectedCard, 'date')}
+                onChange={(event) =>
+                  updateSelectedCard('date', event.target.value)
+                }
+              />
+            </label>
+          )}
+
+          {usesContentField('location') && 'location' in selectedCard && (
+            <label className="card-news-editor__field">
+              <span>장소</span>
+
+              <input
+                type="text"
+                placeholder="장소를 넣어주세요"
+                value={getFieldValue(selectedCard, 'location')}
+                onChange={(event) =>
+                  updateSelectedCard('location', event.target.value)
+                }
+              />
+            </label>
+          )}
+
+          {usesContentField('cta') && 'cta' in selectedCard && (
             <label className="card-news-editor__field">
               <span>CTA</span>
 
@@ -481,14 +577,25 @@ export default function CardNewsEditor({
             <p className="card-news-editor__success">{successMessage}</p>
           )}
 
-          <button
-            type="button"
-            className="card-news-editor__save"
-            disabled={isSaving}
-            onClick={() => void handleSave()}
-          >
-            {isSaving ? '저장 중...' : '수정 내용 저장'}
-          </button>
+          <div className="card-news-editor__actions">
+            <button
+              type="button"
+              className="card-news-editor__save card-news-editor__save--secondary"
+              disabled={isSaving || isGenerating}
+              onClick={() => void handleSave()}
+            >
+              {isSaving ? '저장 중...' : '수정 내용 저장'}
+            </button>
+
+            <button
+              type="button"
+              className="card-news-editor__save"
+              disabled={isSaving || isGenerating}
+              onClick={() => void handleGenerate()}
+            >
+              {isGenerating ? '카드뉴스 생성 중...' : '카드뉴스 만들기'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
