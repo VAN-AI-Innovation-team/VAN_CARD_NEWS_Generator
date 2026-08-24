@@ -27,12 +27,11 @@ public class CardImageGenerationService {
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final HiggsfieldClient higgsfieldClient;
     private final ImagePlacementResolver imagePlacementResolver;
-    private final CoverSplitService coverSplitService;
     private final ImageStorageService imageStorageService;
     private final JobHistoryService jobHistoryService;
 
     @Transactional
-    public List<GeneratedCardImage> generate(Long contentId, boolean splitCoverIntoThree) {
+    public List<GeneratedCardImage> generate(Long contentId) {
         Content content = contentRepository.findByIdWithImages(contentId)
                 .orElseThrow(() -> new IllegalArgumentException("콘텐츠를 찾을 수 없습니다: " + contentId));
 
@@ -54,8 +53,7 @@ public class CardImageGenerationService {
                     content.getTemplate().getLayoutDefinition(),
                     content.getTemplate().getDesignTokens(),
                     content.getTemplate().getCanvasWidth(),
-                    content.getTemplate().getCanvasHeight(),
-                    splitCoverIntoThree
+                    content.getTemplate().getCanvasHeight()
             );
 
             HiggsfieldGenerationResult result = higgsfieldClient.generateCardImages(request);
@@ -64,30 +62,11 @@ public class CardImageGenerationService {
             int sortOrder = 0;
 
             for (HiggsfieldGenerationResult.GeneratedCard card : result.cards()) {
-                if (card.cardType() == HiggsfieldGenerationResult.GeneratedCard.CardType.COVER
-                        && splitCoverIntoThree) {
-                    List<byte[]> pieces = coverSplitService.splitIntoThree(
-                            card.imageBytes(),
-                            content.getTemplate().getCanvasWidth(),
-                            content.getTemplate().getCanvasHeight()
-                    );
-                    for (int i = 0; i < pieces.size(); i++) {
-                        // 💡 2. 3분할 커버: columnIndex는 i(0,1,2), cardIndex는 0으로 지정
-                        saved.add(persist(
-                                content, GeneratedCardImage.CardType.COVER, i, 0, sortOrder++,
-                                pieces.get(i),
-                                content.getTemplate().getCanvasWidth(),
-                                content.getTemplate().getCanvasHeight()
-                        ));
-                    }
-                } else {
-                    GeneratedCardImage.CardType cardType = mapCardType(card.cardType());
-                    // 💡 3. 일반 카드: columnIndex는 0, cardIndex는 card.cardIndex() 지정
-                    saved.add(persist(
-                            content, cardType, 0, card.cardIndex(), sortOrder++,
-                            card.imageBytes(), card.width(), card.height()
-                    ));
-                }
+                GeneratedCardImage.CardType cardType = mapCardType(card.cardType());
+                saved.add(persist(
+                        content, cardType, card.cardIndex(), sortOrder++,
+                        card.imageBytes(), card.width(), card.height()
+                ));
             }
 
             String representativeUrl = saved.isEmpty() ? null : saved.get(0).getImageUrl();
@@ -104,7 +83,6 @@ public class CardImageGenerationService {
     private GeneratedCardImage persist(
             Content content,
             GeneratedCardImage.CardType cardType,
-            int columnIndex,
             int cardIndex,
             int sortOrder,
             byte[] imageBytes,
@@ -117,7 +95,7 @@ public class CardImageGenerationService {
 
         // 💡 4. GeneratedCardImage.create 인자 순서에 맞게 정확히 매핑
         GeneratedCardImage entity = GeneratedCardImage.create(
-                content, cardType, columnIndex, cardIndex, sortOrder,
+                content, cardType, cardIndex, sortOrder,
                 stored.publicUrl(), width, height, stored.storageRef()
         );
         return generatedCardImageRepository.save(entity);

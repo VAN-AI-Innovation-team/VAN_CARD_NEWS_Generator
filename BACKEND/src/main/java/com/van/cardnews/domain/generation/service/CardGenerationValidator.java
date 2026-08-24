@@ -198,6 +198,17 @@ public class CardGenerationValidator {
                 )
         );
 
+        validateCropArea("cover.cropArea", result.cover().cropArea());
+
+        for (int i = 0; i < result.content().size(); i++) {
+            validateCropArea(
+                    "content[" + i + "].cropArea",
+                    result.content().get(i).cropArea()
+            );
+        }
+
+        validateCropArea("closing.cropArea", result.closing().cropArea());
+
         // 최신 템플릿은 closing에도 image 요소가 있으므로 이미지 선택을 검증합니다.
         if (hasContentFieldOrRole(closingElements, "image", "image")) {
             if (result.closing().imageId() == null) {
@@ -205,6 +216,26 @@ public class CardGenerationValidator {
                         "closing에 이미지가 선택되지 않았습니다."
                 );
             }
+        }
+    }
+
+    private static void validateCropArea(
+            String fieldName,
+            CardGenerationResult.CropArea cropArea
+    ) {
+        if (cropArea == null) {
+            return;
+        }
+
+        if (cropArea.x() < 0
+                || cropArea.y() < 0
+                || cropArea.width() <= 0
+                || cropArea.height() <= 0
+                || cropArea.x() + cropArea.width() > 100
+                || cropArea.y() + cropArea.height() > 100) {
+            throw new IllegalArgumentException(
+                    fieldName + "가 유효한 원본 이미지 범위를 벗어났습니다."
+            );
         }
     }
 

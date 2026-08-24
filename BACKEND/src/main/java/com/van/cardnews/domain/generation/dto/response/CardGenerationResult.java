@@ -37,7 +37,7 @@ public record CardGenerationResult(
     }
 
     /**
-     * 원본 이미지 기준 픽셀 단위 크롭 영역입니다.
+     * 원본 이미지 기준 백분율 크롭 영역입니다. (0~100)
      */
     public record CropArea(
             double x,

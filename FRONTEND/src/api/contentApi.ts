@@ -101,6 +101,7 @@ export interface PreviewImage {
   id: number;
   imageUrl: string;
   cropArea: string | null;
+  generatedImageUrl: string | null;
   sortOrder: number;
 }
 
@@ -122,19 +123,8 @@ export interface ContentPreviewResponse {
   approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   template: PreviewTemplate;
   cardGenerationResult: CardGenerationResult | null;
+  cardImagePlacements: CardImagePlacement[] | null;
   images: PreviewImage[];
-}
-
-export interface CropArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface ImageCropUpdate {
-  imageId: number;
-  cropArea: CropArea;
 }
 
 export async function createContent(

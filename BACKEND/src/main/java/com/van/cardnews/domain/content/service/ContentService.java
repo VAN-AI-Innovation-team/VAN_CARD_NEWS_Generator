@@ -46,7 +46,6 @@ public class ContentService {
     private final JobHistoryService jobHistoryService;
     private final ImageStorageService imageStorageService;
     private final TemplateRepository templateRepository;
-    private final CardGenerationValidator cardGenerationValidator;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final ApprovalRequestRepository approvalRequestRepository;
@@ -189,31 +188,43 @@ public class ContentService {
             );
         }
 
-        CardGenerationResult currentResult = objectMapper.convertValue(
-                content.getCardGenerationResult(),
-                CardGenerationResult.class
-        );
+        ObjectNode updated = content.getCardGenerationResult().deepCopy();
+        String cardType = request.cardType().name();
+        String highlight = request.highlight() == null
+                ? null
+                : request.highlight().trim();
 
         try {
-            CardGenerationValidator.validateHighlight(
-                    currentResult,
-                    content.getTemplate().getLayoutDefinition(),
-                    request.cardType().name(),
-                    request.cardIndex(),
-                    request.highlight().trim()
+            if ("COVER".equals(cardType)) {
+                updated.with("cover").put("highlight", highlight);
+            } else if ("CONTENT".equals(cardType)) {
+                ArrayNode cards = updated.withArray("content");
+
+                if (request.cardIndex() < 0 || request.cardIndex() >= cards.size()) {
+                    throw new IllegalArgumentException(
+                            "존재하지 않는 본문 카드 인덱스입니다: " + request.cardIndex()
+                    );
+                }
+
+                ((ObjectNode) cards.get(request.cardIndex()))
+                        .put("highlight", highlight);
+            } else {
+                throw new IllegalArgumentException(
+                        "highlight를 수정할 수 없는 카드 유형입니다: " + cardType
+                );
+            }
+
+            // 하이라이트 수정도 최종 카드 구성 결과 전체 검증을 동일하게 사용합니다.
+            CardGenerationResult updatedResult = objectMapper.convertValue(
+                    updated,
+                    CardGenerationResult.class
+            );
+            CardGenerationValidator.validateJson(
+                    updatedResult,
+                    content.getTemplate().getLayoutDefinition()
             );
         } catch (IllegalArgumentException e) {
             throw new CustomException(ErrorCode.INVALID_INPUT, e.getMessage());
-        }
-
-        ObjectNode updated = content.getCardGenerationResult().deepCopy();
-        String cardType = request.cardType().name();
-
-        if ("COVER".equals(cardType)) {
-            updated.with("cover").put("highlight", request.highlight().trim());
-        } else {
-            ArrayNode cards = (ArrayNode) updated.withArray("content");
-            ((ObjectNode) cards.get(request.cardIndex())).put("highlight", request.highlight().trim());
         }
 
         content.updateCardGenerationResult(updated);
@@ -275,96 +286,137 @@ public class ContentService {
             Long contentId,
             CardImagePlacementUpdateRequest request
     ) {
-        Content content =
-                contentRepository.findById(contentId)
-                        .orElseThrow(() ->
-                                new CustomException(
-                                        ErrorCode.CONTENT_NOT_FOUND
-                                )
-                        );
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
 
-        ArrayNode placements =
-                objectMapper.createArrayNode();
+        if (content.getCardGenerationResult() == null) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "아직 카드 구성 결과가 생성되지 않았습니다."
+            );
+        }
 
-        for (
-                CardImagePlacementUpdateRequest.Placement placement
-                : request.placements()
-        ) {
-            boolean imageExists =
-                    content.getImages()
-                            .stream()
-                            .anyMatch(image ->
-                                    image.getId()
-                                            .equals(
-                                                    placement.imageId()
-                                            )
-                            );
+        CardGenerationResult currentResult = objectMapper.convertValue(
+                content.getCardGenerationResult(),
+                CardGenerationResult.class
+        );
+
+        ArrayNode placements = objectMapper.createArrayNode();
+        ObjectNode updatedResult = content.getCardGenerationResult().deepCopy();
+
+        for (CardImagePlacementUpdateRequest.Placement placement : request.placements()) {
+            String cardType = placement.cardType().trim().toLowerCase();
+
+            if (!cardType.equals("cover")
+                    && !cardType.equals("content")
+                    && !cardType.equals("closing")) {
+                throw new CustomException(
+                        ErrorCode.INVALID_INPUT,
+                        "지원하지 않는 카드 유형입니다: " + placement.cardType()
+                );
+            }
+
+            validateCropArea(placement.cropArea());
+
+            boolean imageExists = content.getImages().stream()
+                    .anyMatch(image -> image.getId().equals(placement.imageId()));
 
             if (!imageExists) {
                 throw new CustomException(
                         ErrorCode.INVALID_INPUT,
-                        "해당 콘텐츠에 존재하지 않는 이미지입니다. id="
-                                + placement.imageId()
+                        "해당 콘텐츠에 존재하지 않는 이미지입니다. id=" + placement.imageId()
                 );
             }
 
-            ObjectNode item =
-                    objectMapper.createObjectNode();
+            validateCardIndex(currentResult, cardType, placement.cardIndex());
 
-            item.put(
-                    "cardType",
-                    placement.cardType()
-            );
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put("cardType", cardType);
+            item.put("cardIndex", placement.cardIndex());
+            item.put("imageId", placement.imageId());
 
-            item.put(
-                    "cardIndex",
-                    placement.cardIndex()
-            );
+            ObjectNode cropArea = objectMapper.createObjectNode();
+            cropArea.put("x", placement.cropArea().x());
+            cropArea.put("y", placement.cropArea().y());
+            cropArea.put("width", placement.cropArea().width());
+            cropArea.put("height", placement.cropArea().height());
 
-            item.put(
-                    "imageId",
-                    placement.imageId()
-            );
+            item.set("cropArea", cropArea);
+            placements.add(item);
 
-            ObjectNode cropArea =
-                    objectMapper.createObjectNode();
-
-            cropArea.put(
-                    "x",
-                    placement.cropArea().x()
-            );
-
-            cropArea.put(
-                    "y",
-                    placement.cropArea().y()
-            );
-
-            cropArea.put(
-                    "width",
-                    placement.cropArea().width()
-            );
-
-            cropArea.put(
-                    "height",
-                    placement.cropArea().height()
-            );
-
-            item.set(
-                    "cropArea",
+            updateResultCropArea(
+                    updatedResult,
+                    cardType,
+                    placement.cardIndex(),
+                    placement.imageId(),
                     cropArea
             );
-
-            placements.add(item);
         }
 
-        content.updateCardImagePlacements(
-                placements
-        );
+        content.updateCardImagePlacements(placements);
+        content.updateCardGenerationResult(updatedResult);
 
         return ContentPreviewResponse.from(
                 content,
                 approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
         );
+    }
+
+    private void validateCardIndex(
+            CardGenerationResult result,
+            String cardType,
+            int cardIndex
+    ) {
+        if ("cover".equals(cardType) || "closing".equals(cardType)) {
+            if (cardIndex != 0) {
+                throw new CustomException(
+                        ErrorCode.INVALID_INPUT,
+                        cardType + " 카드의 인덱스는 0이어야 합니다."
+                );
+            }
+            return;
+        }
+
+        if (cardIndex >= result.content().size()) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "존재하지 않는 본문 카드 인덱스입니다: " + cardIndex
+            );
+        }
+    }
+
+    private void validateCropArea(
+            CardImagePlacementUpdateRequest.CropArea cropArea
+    ) {
+        if (cropArea.x() + cropArea.width() > 100.0
+                || cropArea.y() + cropArea.height() > 100.0) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "크롭 영역이 원본 이미지 범위를 벗어났습니다."
+            );
+        }
+    }
+
+    private void updateResultCropArea(
+            ObjectNode result,
+            String cardType,
+            int cardIndex,
+            long imageId,
+            ObjectNode cropArea
+    ) {
+        ObjectNode card;
+
+        if ("cover".equals(cardType)) {
+            card = (ObjectNode) result.with("cover");
+        } else if ("closing".equals(cardType)) {
+            card = (ObjectNode) result.with("closing");
+        } else {
+            ArrayNode cards = result.withArray("content");
+            card = (ObjectNode) cards.get(cardIndex);
+        }
+
+        card.put("imageId", imageId);
+        card.set("cropArea", cropArea.deepCopy());
     }
 
     private void validateImageCount(

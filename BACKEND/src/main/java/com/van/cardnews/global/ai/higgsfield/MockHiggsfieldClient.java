@@ -24,13 +24,12 @@ public class MockHiggsfieldClient implements HiggsfieldClient {
         int width = request.canvasWidth();
         int height = request.canvasHeight();
 
-        // 1) cover — splitCoverIntoThree면 가로 3배로 생성
-        int coverWidth = request.splitCoverIntoThree() ? width * 3 : width;
+        // 1) cover
         cards.add(new HiggsfieldGenerationResult.GeneratedCard(
                 HiggsfieldGenerationResult.GeneratedCard.CardType.COVER,
                 0,
-                renderPlaceholder("COVER", coverWidth, height, new Color(0x3A, 0x6E, 0xA5)),
-                coverWidth,
+                renderPlaceholder("COVER", width, height, new Color(0x3A, 0x6E, 0xA5)),
+                width,
                 height
         ));
 

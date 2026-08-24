@@ -217,6 +217,30 @@ function getShapeStyle(element: LayoutElement): React.CSSProperties {
   return {};
 }
 
+function getImageCropStyle(
+  content: RenderContext['content'],
+): React.CSSProperties {
+  if (!('cropArea' in content) || !content.cropArea) {
+    return {};
+  }
+
+  const { x, y, width, height } = content.cropArea;
+
+  if (width >= 100 && height >= 100 && x === 0 && y === 0) {
+    return {};
+  }
+
+  const zoom = Math.max(1, 100 / Math.min(width, height));
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+
+  return {
+    objectPosition: `${centerX}% ${centerY}%`,
+    transform: `scale(${zoom})`,
+    transformOrigin: `${centerX}% ${centerY}%`,
+  };
+}
+
 function renderElement(
   elementKey: string,
   element: LayoutElement,
@@ -248,6 +272,7 @@ function renderElement(
             src={image.imageUrl}
             alt=""
             className="card-news-preview__image"
+            style={getImageCropStyle(content)}
           />
         )}
       </div>
