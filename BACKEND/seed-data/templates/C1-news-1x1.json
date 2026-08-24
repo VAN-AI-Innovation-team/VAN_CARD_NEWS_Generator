@@ -66,6 +66,21 @@
             "colorToken": "textSecondary",
             "typographyToken": "footer",
             "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 8,
+            "y": 56,
+            "width": 50,
+            "height": 6,
+            "maxChars": 18,
+            "align": "left",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },
@@ -140,6 +155,21 @@
             "colorToken": "textSecondary",
             "typographyToken": "footer",
             "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 8,
+            "y": 85,
+            "width": 50,
+            "height": 5,
+            "maxChars": 18,
+            "align": "left",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },

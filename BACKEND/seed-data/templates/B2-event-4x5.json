@@ -70,6 +70,21 @@
             "typographyToken": "footer",
             "layer": 3,
             "contentField": "location"
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 79,
+            "width": 48,
+            "height": 5,
+            "maxChars": 18,
+            "align": "left",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },
@@ -139,6 +154,21 @@
             "typographyToken": "footer",
             "layer": 3,
             "contentField": "location"
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 76,
+            "width": 48,
+            "height": 6,
+            "maxChars": 18,
+            "align": "left",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },

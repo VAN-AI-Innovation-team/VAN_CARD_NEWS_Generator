@@ -179,6 +179,36 @@
   line-height: 1;
 }
 
+.card-news-editor__field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-news-editor__field-header small {
+  color: #7b8494;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card-news-editor__highlight-save {
+  align-self: flex-end;
+  border: 1px solid #173d73;
+  border-radius: 7px;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #173d73;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.card-news-editor__highlight-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .card-news-editor__field {
   display: flex;
   flex-direction: column;

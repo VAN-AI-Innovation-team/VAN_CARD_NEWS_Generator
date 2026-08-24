@@ -7,6 +7,7 @@ import com.van.cardnews.domain.content.dto.request.CardImagePlacementUpdateReque
 import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
+import com.van.cardnews.domain.content.dto.request.HighlightUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.entity.Content;
@@ -174,6 +175,56 @@ public class ContentService {
     }
 
     @Transactional
+    public ContentPreviewResponse updateHighlight(
+            Long contentId,
+            HighlightUpdateRequest request
+    ) {
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        if (content.getCardGenerationResult() == null) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "아직 카드 구성 결과가 생성되지 않았습니다."
+            );
+        }
+
+        CardGenerationResult currentResult = objectMapper.convertValue(
+                content.getCardGenerationResult(),
+                CardGenerationResult.class
+        );
+
+        try {
+            CardGenerationValidator.validateHighlight(
+                    currentResult,
+                    content.getTemplate().getLayoutDefinition(),
+                    request.cardType().name(),
+                    request.cardIndex(),
+                    request.highlight().trim()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, e.getMessage());
+        }
+
+        ObjectNode updated = content.getCardGenerationResult().deepCopy();
+        String cardType = request.cardType().name();
+
+        if ("COVER".equals(cardType)) {
+            updated.with("cover").put("highlight", request.highlight().trim());
+        } else {
+            ArrayNode cards = (ArrayNode) updated.withArray("content");
+            ((ObjectNode) cards.get(request.cardIndex())).put("highlight", request.highlight().trim());
+        }
+
+        content.updateCardGenerationResult(updated);
+
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
+    }
+
+    @Transactional
     public ContentPreviewResponse updatePreview(
             Long contentId,
             ContentPreviewUpdateRequest request
@@ -200,10 +251,14 @@ public class ContentService {
                         CardGenerationResult.class
                 );
 
-        CardGenerationValidator.validateJson(
-                resultObj,
-                content.getTemplate().getLayoutDefinition()
-        );
+        try {
+            CardGenerationValidator.validateJson(
+                    resultObj,
+                    content.getTemplate().getLayoutDefinition()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, e.getMessage());
+        }
 
         content.updateCardGenerationResult(
                 request.cardGenerationResult()

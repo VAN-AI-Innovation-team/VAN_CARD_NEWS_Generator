@@ -303,6 +303,16 @@ export default function CardNewsEditor({
     );
   }
 
+  function getHighlightMaxChars(): number | undefined {
+    const elements = getSelectedLayoutCard().elements;
+    const highlightElement = Object.values(elements).find(
+      (element) =>
+        element.contentField === 'highlight' || element.role === 'highlight',
+    );
+
+    return highlightElement?.maxChars;
+  }
+
   async function handleSave() {
     if (!result) {
       return;
@@ -494,11 +504,17 @@ export default function CardNewsEditor({
 
           {'highlight' in selectedCard && (
             <label className="card-news-editor__field">
-              <span>강조 문구</span>
+              <div className="card-news-editor__field-header">
+                <span>강조 문구</span>
+                {getHighlightMaxChars() !== undefined && (
+                  <small>최대 {getHighlightMaxChars()}자</small>
+                )}
+              </div>
 
               <input
                 type="text"
                 value={getFieldValue(selectedCard, 'highlight')}
+                maxLength={getHighlightMaxChars()}
                 onChange={(event) =>
                   updateSelectedCard('highlight', event.target.value)
                 }
