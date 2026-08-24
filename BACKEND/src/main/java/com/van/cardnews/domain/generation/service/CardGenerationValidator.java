@@ -272,11 +272,27 @@ public class CardGenerationValidator {
                 elements.path(elementName)
                         .path("maxChars");
 
-        if (!maxChars.isInt()) {
-            return DEFAULT_MAX_CHARS;
+        if (maxChars.isInt()) {
+            return maxChars.asInt();
         }
 
-        return maxChars.asInt();
+        // 일부 템플릿은 요소 이름이 highlight가 아니어도
+        // role/contentField로 강조 문구를 바인딩합니다.
+        if ("highlight".equals(elementName) && elements.isObject()) {
+            var fields = elements.fields();
+            while (fields.hasNext()) {
+                JsonNode element = fields.next().getValue();
+                if ("highlight".equals(element.path("contentField").asText(null))
+                        || "highlight".equals(element.path("role").asText(null))) {
+                    JsonNode fallbackMaxChars = element.path("maxChars");
+                    if (fallbackMaxChars.isInt()) {
+                        return fallbackMaxChars.asInt();
+                    }
+                }
+            }
+        }
+
+        return DEFAULT_MAX_CHARS;
     }
 
     private static void validateText(

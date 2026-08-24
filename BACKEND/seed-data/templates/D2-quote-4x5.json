@@ -62,7 +62,8 @@
             "align": "center",
             "colorToken": "accent",
             "typographyToken": "footer",
-            "layer": 3
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },
@@ -121,7 +122,8 @@
             "align": "center",
             "colorToken": "accent",
             "typographyToken": "footer",
-            "layer": 3
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },

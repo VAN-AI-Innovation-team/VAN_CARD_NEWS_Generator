@@ -4,6 +4,7 @@ import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
+import com.van.cardnews.domain.content.dto.request.HighlightUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.service.ContentService;
 import com.van.cardnews.domain.content.dto.request.CardImagePlacementUpdateRequest;
@@ -57,6 +58,17 @@ public class ContentController {
     ) {
         List<MultipartFile> safeImages = images != null ? images : Collections.emptyList();
         ContentCreateResponse response = contentService.editContent(contentId, request, safeImages);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{contentId}/highlight")
+    public ResponseEntity<ContentPreviewResponse> updateHighlight(
+            @PathVariable Long contentId,
+            @Valid @RequestBody HighlightUpdateRequest request
+    ) {
+        ContentPreviewResponse response =
+                contentService.updateHighlight(contentId, request);
+
         return ResponseEntity.ok(response);
     }
 

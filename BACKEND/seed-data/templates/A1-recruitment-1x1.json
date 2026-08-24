@@ -73,7 +73,8 @@
             "colorToken": "primaryDark",
             "backgroundToken": "textOnDark",
             "typographyToken": "highlight",
-            "layer": 3
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },
@@ -157,7 +158,8 @@
             "colorToken": "textOnDark",
             "backgroundToken": "primary",
             "typographyToken": "highlight",
-            "layer": 3
+            "layer": 3,
+            "contentField": "highlight"
           }
         }
       },

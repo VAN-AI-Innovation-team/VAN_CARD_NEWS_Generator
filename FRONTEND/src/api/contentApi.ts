@@ -213,6 +213,26 @@ export async function editContent(
   return response.data;
 }
 
+export type HighlightCardType = 'COVER' | 'CONTENT';
+
+export interface HighlightUpdatePayload {
+  cardType: HighlightCardType;
+  cardIndex: number;
+  highlight: string;
+}
+
+export async function updateCardHighlight(
+  contentId: number,
+  payload: HighlightUpdatePayload,
+): Promise<ContentPreviewResponse> {
+  const response = await axios.put<ContentPreviewResponse>(
+    `/api/contents/${contentId}/highlight`,
+    payload,
+  );
+
+  return response.data;
+}
+
 export async function updateContentPreview(
   contentId: number,
   cardGenerationResult: CardGenerationResult,
