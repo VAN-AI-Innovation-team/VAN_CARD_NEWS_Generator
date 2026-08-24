@@ -29,13 +29,12 @@ public class GeneratedCardImageController {
     private final GeneratedImageZipService generatedImageZipService;
     private final ApprovalRequestRepository approvalRequestRepository;
 
-    /** 카드뉴스 이미지 생성 트리거 (Higgsfield 호출 → 저장 → 3분할 후처리) */
+    /** 카드뉴스 이미지 생성 트리거 (Higgsfield 호출 → 저장) */
     @PostMapping("/generate")
     public ResponseEntity<List<GeneratedCardImageResponse>> generate(
-            @PathVariable Long contentId,
-            @RequestParam(defaultValue = "false") boolean splitCoverIntoThree
+            @PathVariable Long contentId
     ) {
-        List<GeneratedCardImage> images = cardImageGenerationService.generate(contentId, splitCoverIntoThree);
+        List<GeneratedCardImage> images = cardImageGenerationService.generate(contentId);
         return ResponseEntity.ok(GeneratedCardImageResponse.from(images));
     }
 

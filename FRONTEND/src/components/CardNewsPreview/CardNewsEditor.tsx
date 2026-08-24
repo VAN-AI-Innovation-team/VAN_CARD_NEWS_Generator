@@ -2,12 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type {
   CardGenerationResult,
+  CardImagePlacement,
   ContentPreviewResponse,
 } from '../../api/contentApi';
 
-import { updateContentPreview } from '../../api/contentApi';
+import {
+  updateCardImagePlacements,
+  updateContentPreview,
+} from '../../api/contentApi';
 
 import CardNewsPreview from './CardNewsPreview';
+import ImageCropEditor from './ImageCropEditor';
 
 import './CardNewsEditor.css';
 
@@ -42,6 +47,34 @@ function cloneResult(result: CardGenerationResult): CardGenerationResult {
   };
 }
 
+function cloneResultWithPlacements(
+  result: CardGenerationResult,
+  placements: CardImagePlacement[] | null,
+): CardGenerationResult {
+  const next = cloneResult(result);
+
+  for (const placement of placements ?? []) {
+    if (placement.cardType === 'cover' && placement.cardIndex === 0) {
+      next.cover.imageId = placement.imageId;
+      next.cover.cropArea = { ...placement.cropArea };
+      continue;
+    }
+
+    if (placement.cardType === 'closing' && placement.cardIndex === 0) {
+      next.closing.imageId = placement.imageId;
+      next.closing.cropArea = { ...placement.cropArea };
+      continue;
+    }
+
+    if (placement.cardType === 'content' && next.content[placement.cardIndex]) {
+      next.content[placement.cardIndex].imageId = placement.imageId;
+      next.content[placement.cardIndex].cropArea = { ...placement.cropArea };
+    }
+  }
+
+  return next;
+}
+
 function createEmptyContentCard(): CardGenerationResult['content'][number] {
   return {
     title: '새 카드 제목',
@@ -61,7 +94,10 @@ export default function CardNewsEditor({
 }: CardNewsEditorProps) {
   const [result, setResult] = useState<CardGenerationResult | null>(
     preview.cardGenerationResult
-      ? cloneResult(preview.cardGenerationResult)
+      ? cloneResultWithPlacements(
+          preview.cardGenerationResult,
+          preview.cardImagePlacements,
+        )
       : null,
   );
 
@@ -74,7 +110,12 @@ export default function CardNewsEditor({
 
   useEffect(() => {
     if (preview.cardGenerationResult) {
-      setResult(cloneResult(preview.cardGenerationResult));
+      setResult(
+        cloneResultWithPlacements(
+          preview.cardGenerationResult,
+          preview.cardImagePlacements,
+        ),
+      );
       setSelectedCardIndex(0);
       setError(null);
     }
@@ -226,6 +267,118 @@ export default function CardNewsEditor({
     return null;
   }
 
+  function getSelectedCropArea(): NonNullable<EditableCard['cropArea']> {
+    if (
+      !selectedCard ||
+      !('cropArea' in selectedCard) ||
+      !selectedCard.cropArea
+    ) {
+      return {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      };
+    }
+
+    return { ...selectedCard.cropArea };
+  }
+
+  function updateSelectedCropArea(
+    cropArea: NonNullable<EditableCard['cropArea']>,
+  ) {
+    setResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const next = cloneResult(current);
+
+      if (selectedCardIndex === 0) {
+        next.cover.cropArea = { ...cropArea };
+        return next;
+      }
+
+      if (selectedCardIndex <= next.content.length) {
+        next.content[selectedCardIndex - 1].cropArea = { ...cropArea };
+        return next;
+      }
+
+      next.closing.cropArea = { ...cropArea };
+      return next;
+    });
+  }
+
+  function buildCropPlacements(
+    currentResult: CardGenerationResult,
+  ): CardImagePlacement[] {
+    const placements: CardImagePlacement[] = [];
+
+    if (currentResult.cover.imageId != null) {
+      placements.push({
+        cardType: 'cover',
+        cardIndex: 0,
+        imageId: currentResult.cover.imageId,
+        cropArea: currentResult.cover.cropArea ?? {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        },
+      });
+    }
+
+    currentResult.content.forEach((card, index) => {
+      if (card.imageId == null) {
+        return;
+      }
+
+      placements.push({
+        cardType: 'content',
+        cardIndex: index,
+        imageId: card.imageId,
+        cropArea: card.cropArea ?? {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        },
+      });
+    });
+
+    if (currentResult.closing.imageId != null) {
+      placements.push({
+        cardType: 'closing',
+        cardIndex: 0,
+        imageId: currentResult.closing.imageId,
+        cropArea: currentResult.closing.cropArea ?? {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        },
+      });
+    }
+
+    return placements;
+  }
+
+  async function persistEditorState(
+    currentResult: CardGenerationResult,
+  ): Promise<ContentPreviewResponse> {
+    const previewWithText = await updateContentPreview(
+      preview.contentId,
+      currentResult,
+    );
+
+    const updatedPreview = await updateCardImagePlacements(
+      preview.contentId,
+      buildCropPlacements(currentResult),
+    );
+
+    return updatedPreview ?? previewWithText;
+  }
+
   function addContentCard() {
     setResult((current) => {
       if (!current) {
@@ -323,10 +476,7 @@ export default function CardNewsEditor({
       setError(null);
       setSuccessMessage(null);
 
-      const updatedPreview = await updateContentPreview(
-        preview.contentId,
-        result,
-      );
+      const updatedPreview = await persistEditorState(result);
 
       onUpdated(updatedPreview);
 
@@ -350,10 +500,7 @@ export default function CardNewsEditor({
       setError(null);
       setSuccessMessage(null);
 
-      const updatedPreview = await updateContentPreview(
-        preview.contentId,
-        result,
-      );
+      const updatedPreview = await persistEditorState(result);
 
       onUpdated(updatedPreview);
       await onGenerate(updatedPreview);
@@ -588,6 +735,20 @@ export default function CardNewsEditor({
               </select>
             </label>
           )}
+
+          {'imageId' in selectedCard &&
+            getSelectedImageId() != null &&
+            preview.images.some(
+              (image) => image.id === getSelectedImageId(),
+            ) && (
+              <ImageCropEditor
+                image={preview.images.find(
+                  (image) => image.id === getSelectedImageId(),
+                )!}
+                cropArea={getSelectedCropArea()}
+                onChange={updateSelectedCropArea}
+              />
+            )}
 
           {error && <p className="card-news-editor__error">{error}</p>}
 

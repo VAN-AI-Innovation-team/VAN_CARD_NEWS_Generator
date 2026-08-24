@@ -8,6 +8,5 @@ public record HiggsfieldGenerationRequest(
         JsonNode layoutDefinition,       // Template.layoutDefinition
         JsonNode designTokens,           // Template.designTokens
         int canvasWidth,                 // Template.canvasWidth (단일 카드 기준)
-        int canvasHeight,                // Template.canvasHeight (단일 카드 기준)
-        boolean splitCoverIntoThree
+        int canvasHeight                 // Template.canvasHeight (단일 카드 기준)
 ) {}

@@ -29,10 +29,6 @@ public class GeneratedCardImage {
     @Column(name = "card_type", nullable = false, length = 20)
     private CardType cardType;
 
-    /** 몇 번째 카드 세트인지 (예: 0=좌측, 1=중앙, 2=우측) */
-    @Column(name = "column_index", nullable = false)
-    private int columnIndex;
-
     /** 세트 내에서의 순번 (CONTENT의 경우 여러 장일 수 있으므로 순서 지정) */
     @Column(name = "card_index", nullable = false)
     private int cardIndex;
@@ -60,7 +56,6 @@ public class GeneratedCardImage {
     private GeneratedCardImage(
             Content content,
             CardType cardType,
-            int columnIndex,
             int cardIndex,
             int sortOrder,
             String imageUrl,
@@ -70,7 +65,6 @@ public class GeneratedCardImage {
     ) {
         this.content = content;
         this.cardType = cardType;
-        this.columnIndex = columnIndex;
         this.cardIndex = cardIndex;
         this.sortOrder = sortOrder;
         this.imageUrl = imageUrl;
@@ -82,7 +76,6 @@ public class GeneratedCardImage {
     public static GeneratedCardImage create(
             Content content,
             CardType cardType,
-            int columnIndex,
             int cardIndex,
             int sortOrder,
             String imageUrl,
@@ -93,7 +86,6 @@ public class GeneratedCardImage {
         return GeneratedCardImage.builder()
                 .content(content)
                 .cardType(cardType)
-                .columnIndex(columnIndex)
                 .cardIndex(cardIndex)
                 .sortOrder(sortOrder)
                 .imageUrl(imageUrl)
