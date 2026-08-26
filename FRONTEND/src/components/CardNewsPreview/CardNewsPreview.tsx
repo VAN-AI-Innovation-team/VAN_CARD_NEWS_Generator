@@ -6,6 +6,8 @@ import type {
   PreviewTemplate,
 } from '../../api/contentApi';
 
+import { getCropImageStyle } from './cropUtils';
+
 import './CardNewsPreview.css';
 
 interface CardNewsPreviewProps {
@@ -13,6 +15,10 @@ interface CardNewsPreviewProps {
   cardGenerationResult: CardGenerationResult;
   images: PreviewImage[];
   cardIndex: number;
+  editingField?: string | null;
+  onStartEdit?: (field: string) => void;
+  onTextChange?: (field: string, value: string) => void;
+  onFinishEdit?: () => void;
 }
 
 interface RenderContext {
@@ -24,15 +30,8 @@ interface RenderContext {
   images: PreviewImage[];
 }
 
-/**
- * 채우기(면) 역할과 텍스트 역할을 구분합니다.
- *
- * - SHAPE_ROLES: 배경/오버레이/패널/구분선처럼 "면"을 그리는 요소.
- *   colorToken 값을 배경색(backgroundColor)으로 사용합니다.
- * - TEXT_ROLES: 실제 글자를 그리는 요소.
- *   colorToken은 글자색(color), backgroundToken은 뱃지/칩의 배경색으로 사용합니다.
- */
 const SHAPE_ROLES = new Set(['background', 'overlay', 'panel', 'divider']);
+
 const TEXT_ROLES = new Set([
   'title',
   'body',
@@ -41,17 +40,22 @@ const TEXT_ROLES = new Set([
   'footer',
   'badge',
   'decoration',
+  'cta',
+  'date',
+  'location',
 ]);
 
-function getTokenValue(
-  tokens: Record<string, string>,
-  token?: string,
-): string | undefined {
-  if (!token) {
-    return undefined;
-  }
+const EDITABLE_FIELDS = new Set([
+  'title',
+  'body',
+  'highlight',
+  'date',
+  'location',
+  'cta',
+]);
 
-  return tokens[token];
+function getTokenValue(tokens: Record<string, string>, token?: string) {
+  return token ? tokens[token] : undefined;
 }
 
 function getContentFieldValue(
@@ -89,7 +93,7 @@ function getContentFieldValue(
   return '';
 }
 
-function getText(role: string, content: RenderContext['content']): string {
+function getRoleText(role: string, content: RenderContext['content']): string {
   if (role === 'title') {
     return 'title' in content ? (content.title ?? '') : '';
   }
@@ -140,7 +144,7 @@ function getLayoutCard(
 function getContentImage(
   content: RenderContext['content'],
   images: PreviewImage[],
-): PreviewImage | undefined {
+) {
   if (!('imageId' in content) || content.imageId == null) {
     return undefined;
   }
@@ -148,14 +152,6 @@ function getContentImage(
   return images.find((image) => image.id === content.imageId);
 }
 
-/**
- * designTokens.typography는 `${typographyToken}Size` / `${typographyToken}Weight` /
- * `${typographyToken}LineHeight` / `${typographyToken}LetterSpacing` 형태의 키를
- * 가진 값 모음입니다. Size/LetterSpacing은 1080px 캔버스 기준 px 값으로 저장되어
- * 있으므로, 실제 렌더링 시에는 캔버스 폭에 대한 비율(cqw)로 환산해 적용합니다.
- * cqw는 `.card-news-preview`에 선언된 컨테이너 크기를 기준으로 계산되므로,
- * 카드가 화면에서 어떤 크기로 표시되든 항상 동일한 비율로 스케일됩니다.
- */
 function getTypographyStyle(
   typography: Record<string, string>,
   typographyToken: string | undefined,
@@ -165,58 +161,67 @@ function getTypographyStyle(
     return {};
   }
 
-  const toCqw = (raw?: string): string | undefined => {
+  const toCqw = (raw?: string) => {
     if (!raw) {
       return undefined;
     }
 
     const numeric = Number.parseFloat(raw);
 
-    if (Number.isNaN(numeric)) {
-      return undefined;
-    }
-
-    return `${(numeric / canvasWidth) * 100}cqw`;
+    return Number.isNaN(numeric)
+      ? undefined
+      : `${(numeric / canvasWidth) * 100}cqw`;
   };
 
   const style: React.CSSProperties = {};
 
   const fontSize = toCqw(typography[`${typographyToken}Size`]);
+
+  const letterSpacing = toCqw(typography[`${typographyToken}LetterSpacing`]);
+
   if (fontSize) {
     style.fontSize = fontSize;
   }
 
+  if (letterSpacing) {
+    style.letterSpacing = letterSpacing;
+  }
+
   const fontWeight = typography[`${typographyToken}Weight`];
+
   if (fontWeight) {
     style.fontWeight = fontWeight as React.CSSProperties['fontWeight'];
   }
 
   const lineHeight = typography[`${typographyToken}LineHeight`];
+
   if (lineHeight) {
     style.lineHeight = lineHeight;
-  }
-
-  const letterSpacing = toCqw(typography[`${typographyToken}LetterSpacing`]);
-  if (letterSpacing) {
-    style.letterSpacing = letterSpacing;
   }
 
   return style;
 }
 
-/** shape 속성에 따른 모서리 처리. pill은 완전한 알약형, badge/chip은 둥근 사각형입니다. */
 function getShapeStyle(element: LayoutElement): React.CSSProperties {
   if (element.shape === 'pill') {
-    return { borderRadius: '999px' };
+    return {
+      borderRadius: '999px',
+    };
   }
 
   if (element.shape === 'badge' || element.shape === 'chip') {
-    return { borderRadius: '1.4cqw' };
+    return {
+      borderRadius: '1.4cqw',
+    };
   }
 
   return {};
 }
 
+/**
+ * ImageCropEditor의 LIVE CROP PREVIEW와
+ * 동일한 공통 crop 계산을 사용합니다.
+ */
 function getImageCropStyle(
   content: RenderContext['content'],
 ): React.CSSProperties {
@@ -224,29 +229,35 @@ function getImageCropStyle(
     return {};
   }
 
-  const { x, y, width, height } = content.cropArea;
+  return getCropImageStyle(content.cropArea);
+}
 
-  if (width >= 100 && height >= 100 && x === 0 && y === 0) {
-    return {};
+function getElementText(
+  element: LayoutElement,
+  content: RenderContext['content'],
+): string {
+  if (element.contentField) {
+    return getContentFieldValue(element.contentField, content);
   }
 
-  const zoom = Math.max(1, 100 / Math.min(width, height));
-  const centerX = x + width / 2;
-  const centerY = y + height / 2;
+  if (EDITABLE_FIELDS.has(element.role)) {
+    return getRoleText(element.role, content);
+  }
 
-  return {
-    objectPosition: `${centerX}% ${centerY}%`,
-    transform: `scale(${zoom})`,
-    transformOrigin: `${centerX}% ${centerY}%`,
-  };
+  return element.text ?? '';
 }
 
 function renderElement(
   elementKey: string,
   element: LayoutElement,
   context: RenderContext,
+  props: Pick<
+    CardNewsPreviewProps,
+    'editingField' | 'onStartEdit' | 'onTextChange' | 'onFinishEdit'
+  >,
 ) {
   const { template, content, images } = context;
+
   const { colors, typography } = template.designTokens;
 
   const style: React.CSSProperties = {
@@ -280,8 +291,8 @@ function renderElement(
   }
 
   if (SHAPE_ROLES.has(element.role)) {
-    // 면 요소는 colorToken을 "채우는 색"으로 해석합니다.
     style.backgroundColor = getTokenValue(colors, element.colorToken);
+
     Object.assign(style, getShapeStyle(element));
 
     return (
@@ -293,45 +304,97 @@ function renderElement(
     );
   }
 
-  if (TEXT_ROLES.has(element.role)) {
-    // 텍스트 요소는 colorToken이 글자색, backgroundToken이 칩/뱃지 배경색입니다.
-    style.color = getTokenValue(colors, element.colorToken);
+  if (!TEXT_ROLES.has(element.role)) {
+    return null;
+  }
 
-    const backgroundColor = getTokenValue(colors, element.backgroundToken);
-    if (backgroundColor) {
-      style.backgroundColor = backgroundColor;
-    }
+  style.color = getTokenValue(colors, element.colorToken);
 
-    Object.assign(
-      style,
-      getTypographyStyle(
-        typography,
-        element.typographyToken,
-        template.canvasWidth,
-      ),
-    );
-    Object.assign(style, getShapeStyle(element));
+  const backgroundColor = getTokenValue(colors, element.backgroundToken);
 
-    const dynamicText = getContentFieldValue(element.contentField, content);
-    const roleText = getText(element.role, content);
+  if (backgroundColor) {
+    style.backgroundColor = backgroundColor;
+  }
 
-    // contentField가 지정된 요소는 실제 카드 데이터를 우선합니다.
-    // 일부 기존 템플릿은 highlight/title/body 요소에 contentField가 빠져 있어도
-    // 카드 데이터가 존재하므로, 역할에 해당하는 실제 값도 우선 반영합니다.
-    const text = dynamicText || roleText || element.text || '';
+  Object.assign(
+    style,
+    getTypographyStyle(
+      typography,
+      element.typographyToken,
+      template.canvasWidth,
+    ),
+  );
+
+  Object.assign(style, getShapeStyle(element));
+
+  const field =
+    element.contentField && EDITABLE_FIELDS.has(element.contentField)
+      ? element.contentField
+      : EDITABLE_FIELDS.has(element.role)
+        ? element.role
+        : null;
+
+  const text = getElementText(element, content);
+
+  const isEditing = field != null && props.editingField === field;
+
+  if (isEditing && field) {
+    const common = {
+      value: text,
+      maxLength: element.maxChars,
+      autoFocus: true,
+      onChange: (
+        event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+      ) => props.onTextChange?.(field, event.target.value),
+      onBlur: () => props.onFinishEdit?.(),
+      onKeyDown: (
+        event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+      ) => {
+        if (event.key === 'Escape') {
+          props.onFinishEdit?.();
+        }
+
+        if (event.key === 'Enter' && field !== 'body') {
+          event.preventDefault();
+          props.onFinishEdit?.();
+        }
+      },
+      onClick: (event: React.MouseEvent) => {
+        event.stopPropagation();
+      },
+    };
 
     return (
       <div
         key={elementKey}
-        className={`card-news-preview__element card-news-preview__text card-news-preview__text--${element.role}`}
+        className="card-news-preview__element card-news-preview__text card-news-preview__text--editing"
         style={style}
       >
-        {text}
+        {field === 'body' ? (
+          <textarea
+            {...common}
+            className="card-news-preview__inline-editor card-news-preview__inline-editor--textarea"
+          />
+        ) : (
+          <input {...common} className="card-news-preview__inline-editor" />
+        )}
       </div>
     );
   }
 
-  return null;
+  return (
+    <div
+      key={elementKey}
+      className={`card-news-preview__element card-news-preview__text card-news-preview__text--${element.role} ${
+        field ? 'card-news-preview__text--editable' : ''
+      }`}
+      style={style}
+      onClick={() => field && props.onStartEdit?.(field)}
+      title={field ? '클릭해서 수정' : undefined}
+    >
+      {text}
+    </div>
+  );
 }
 
 export default function CardNewsPreview({
@@ -339,6 +402,10 @@ export default function CardNewsPreview({
   cardGenerationResult,
   images,
   cardIndex,
+  editingField,
+  onStartEdit,
+  onTextChange,
+  onFinishEdit,
 }: CardNewsPreviewProps) {
   const { card, content } = getLayoutCard(
     template,
@@ -356,11 +423,21 @@ export default function CardNewsPreview({
       {Object.entries(card.elements)
         .sort(([, a], [, b]) => (a.layer ?? 0) - (b.layer ?? 0))
         .map(([key, element]) =>
-          renderElement(key, element, {
-            template,
-            content,
-            images,
-          }),
+          renderElement(
+            key,
+            element,
+            {
+              template,
+              content,
+              images,
+            },
+            {
+              editingField,
+              onStartEdit,
+              onTextChange,
+              onFinishEdit,
+            },
+          ),
         )}
     </div>
   );

@@ -8,6 +8,7 @@ import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.anthropic.models.messages.TextBlockParam;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +27,17 @@ public class ClaudeClientImpl implements ClaudeClient {
     private final AnthropicClient client;
     private final String model;
     private final long maxTokens;
+    private final ObjectMapper objectMapper;
 
     public ClaudeClientImpl(
             @Value("${app.ai.claude.model}") String model,
-            @Value("${app.ai.claude.max-tokens}") long maxTokens
+            @Value("${app.ai.claude.max-tokens}") long maxTokens,
+            ObjectMapper objectMapper
     ) {
         this.client = AnthropicOkHttpClient.fromEnv();
         this.model = model;
         this.maxTokens = maxTokens;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -77,7 +81,66 @@ public class ClaudeClientImpl implements ClaudeClient {
         return result;
     }
 
-    private List<ContentBlockParam> buildContentBlocks(
+    @Override
+    public CardGenerationResult regenerateCardContent(
+            CardGenerationRequest request,
+            CardGenerationResult currentResult,
+            String cardType,
+            int cardIndex,
+            String instruction
+    ) {
+        List<ContentBlockParam> blocks =
+                buildContentBlocksForRegeneration(
+                        request,
+                        currentResult,
+                        cardType,
+                        cardIndex,
+                        instruction
+                );
+
+        StructuredMessageCreateParams<CardGenerationResult> params =
+                StructuredMessageCreateParams
+                        .<CardGenerationResult>builder()
+                        .model(model)
+                        .maxTokens(maxTokens)
+                        .addUserMessageOfBlockParams(blocks)
+                        .outputConfig(CardGenerationResult.class)
+                        .build();
+
+        StructuredMessage<CardGenerationResult> response =
+                client.messages().create(params);
+
+        CardGenerationResult result =
+                response.content()
+                        .stream()
+                        .flatMap(contentBlock ->
+                                contentBlock.text().stream()
+                        )
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Claude가 카드 재작성 결과를 반환하지 않았습니다."
+                                )
+                        )
+                        .text();
+
+        log.info(
+                "Claude 카드 재작성 완료 - contentType={}, cardType={}, cardIndex={}",
+                request.contentType(),
+                cardType,
+                cardIndex
+        );
+
+        return result;
+    }
+
+    /**
+     * Claude 요청에 포함할 이미지 블록을 생성합니다.
+     *
+     * 일반 카드 생성과 특정 카드 재생성에서 동일한 이미지 입력을 사용하므로
+     * 공통 메서드로 관리합니다.
+     */
+    private List<ContentBlockParam> buildImageBlocks(
             CardGenerationRequest request
     ) {
         List<ContentBlockParam> blocks =
@@ -117,10 +180,54 @@ public class ClaudeClientImpl implements ClaudeClient {
             );
         }
 
+        return blocks;
+    }
+
+    private List<ContentBlockParam> buildContentBlocks(
+            CardGenerationRequest request
+    ) {
+        List<ContentBlockParam> blocks =
+                new ArrayList<>(
+                        buildImageBlocks(request)
+                );
+
         blocks.add(
                 ContentBlockParam.ofText(
                         TextBlockParam.builder()
-                                .text(buildPrompt(request))
+                                .text(
+                                        buildPrompt(request)
+                                )
+                                .build()
+                )
+        );
+
+        return blocks;
+    }
+
+    private List<ContentBlockParam> buildContentBlocksForRegeneration(
+            CardGenerationRequest request,
+            CardGenerationResult currentResult,
+            String cardType,
+            int cardIndex,
+            String instruction
+    ) {
+        List<ContentBlockParam> blocks =
+                new ArrayList<>(
+                        buildImageBlocks(request)
+                );
+
+        blocks.add(
+                ContentBlockParam.ofText(
+                        TextBlockParam.builder()
+                                .text(
+                                        buildRegenerationPrompt(
+                                                request,
+                                                currentResult,
+                                                cardType,
+                                                cardIndex,
+                                                instruction
+                                        )
+                                )
                                 .build()
                 )
         );
@@ -134,10 +241,13 @@ public class ClaudeClientImpl implements ClaudeClient {
         return switch (mediaType) {
             case "image/jpeg" ->
                     Base64ImageSource.MediaType.IMAGE_JPEG;
+
             case "image/png" ->
                     Base64ImageSource.MediaType.IMAGE_PNG;
+
             case "image/webp" ->
                     Base64ImageSource.MediaType.IMAGE_WEBP;
+
             default ->
                     throw new IllegalArgumentException(
                             "지원하지 않는 이미지 형식입니다: " +
@@ -191,6 +301,63 @@ public class ClaudeClientImpl implements ClaudeClient {
                 request.title(),
                 request.body(),
                 request.layoutDefinition()
+        );
+    }
+
+    private String buildRegenerationPrompt(
+            CardGenerationRequest request,
+            CardGenerationResult currentResult,
+            String cardType,
+            int cardIndex,
+            String instruction
+    ) {
+        return """
+                당신은 카드뉴스의 특정 카드만 수정하는 AI입니다.
+
+                입력된 원문과 현재 카드 구성에 근거하여
+                사용자가 지정한 카드 하나만 재작성하세요.
+
+                반드시 다음 규칙을 지키세요.
+
+                1. 지정된 카드 외의 내용은 변경하지 마세요.
+                2. 지정된 카드 외의 필드는 기존 값을 그대로 유지하세요.
+                3. 원문에 없는 사실, 숫자, 일정, 인용, 혜택 등을 생성하지 마세요.
+                4. 날짜와 장소는 원문에 실제로 존재하는 경우에만 사용하세요.
+                5. 날짜나 장소가 원문에 없다면 기존 값을 유지하거나 null로 유지하세요.
+                6. 템플릿의 maxChars를 준수하세요.
+                7. 카드의 의미와 기존 카드뉴스의 전체적인 문맥을 유지하세요.
+                8. 사용자의 수정 요청을 우선적으로 반영하세요.
+                9. 결과는 기존 CardGenerationResult 구조를 유지해야 합니다.
+                10. 이미지의 imageId와 cropArea는 사용자가 직접 수정하지 않는 한 변경하지 마세요.
+
+                [콘텐츠 유형]
+                %s
+
+                [제목]
+                %s
+
+                [본문 원문]
+                %s
+
+                [현재 카드 구성 JSON]
+                %s
+
+                [재작성 대상]
+                cardType=%s
+                cardIndex=%d
+
+                [사용자 요청]
+                %s
+                """.formatted(
+                request.contentType(),
+                request.title(),
+                request.body(),
+                objectMapper
+                        .valueToTree(currentResult)
+                        .toString(),
+                cardType,
+                cardIndex,
+                instruction
         );
     }
 }

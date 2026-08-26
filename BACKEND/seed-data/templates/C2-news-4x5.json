@@ -170,6 +170,24 @@
             "typographyToken": "highlight",
             "layer": 3,
             "contentField": "highlight"
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
           }
         }
       },

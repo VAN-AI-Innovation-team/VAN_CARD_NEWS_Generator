@@ -2,6 +2,8 @@ package com.van.cardnews.domain.content.controller;
 
 import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
+import com.van.cardnews.domain.content.dto.request.ContentTemplateUpdateRequest;
+import com.van.cardnews.domain.content.dto.request.CardRegenerationRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
 import com.van.cardnews.domain.content.dto.request.HighlightUpdateRequest;
@@ -59,6 +61,26 @@ public class ContentController {
         List<MultipartFile> safeImages = images != null ? images : Collections.emptyList();
         ContentCreateResponse response = contentService.editContent(contentId, request, safeImages);
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{contentId}/template")
+    public ResponseEntity<ContentPreviewResponse> updateTemplate(
+            @PathVariable Long contentId,
+            @Valid @RequestBody ContentTemplateUpdateRequest request
+    ) {
+        return ResponseEntity.ok(
+                contentService.updateTemplate(contentId, request)
+        );
+    }
+
+    @PostMapping("/{contentId}/cards/regenerate")
+    public ResponseEntity<ContentPreviewResponse> regenerateCard(
+            @PathVariable Long contentId,
+            @Valid @RequestBody CardRegenerationRequest request
+    ) {
+        return ResponseEntity.ok(
+                contentService.regenerateCard(contentId, request)
+        );
     }
 
     @PutMapping("/{contentId}/highlight")

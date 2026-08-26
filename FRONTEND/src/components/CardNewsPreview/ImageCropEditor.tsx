@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { CropArea, PreviewImage } from '../../api/contentApi';
 
+import {
+  DEFAULT_CROP_AREA,
+  MIN_CROP_SIZE,
+  normalizeCropArea,
+} from './cropUtils';
+
 import './ImageCropEditor.css';
 
 interface ImageCropEditorProps {
@@ -12,30 +18,13 @@ interface ImageCropEditorProps {
 
 type InteractionMode = 'move' | 'resize' | null;
 
-const MIN_SIZE = 5;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeCropArea(cropArea: CropArea): CropArea {
-  const width = clamp(cropArea.width, MIN_SIZE, 100);
-  const height = clamp(cropArea.height, MIN_SIZE, 100);
-
-  return {
-    width,
-    height,
-    x: clamp(cropArea.x, 0, 100 - width),
-    y: clamp(cropArea.y, 0, 100 - height),
-  };
-}
-
 export default function ImageCropEditor({
   image,
   cropArea,
   onChange,
 }: ImageCropEditorProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+
   const imageRef = useRef<HTMLImageElement>(null);
 
   const interactionRef = useRef<{
@@ -52,19 +41,18 @@ export default function ImageCropEditor({
 
   const [isInteracting, setIsInteracting] = useState(false);
 
-  /*
-   * 중요:
-   * 드래그가 진행되는 동안에는 interactionRef.current.startCrop을
-   * 현재 cropArea로 다시 덮어쓰지 않습니다.
-   *
-   * 이렇게 해야 mousemove마다 부모 state가 변경되더라도
-   * 드래그 시작 시점의 crop 영역을 기준으로 계산할 수 있습니다.
-   */
   useEffect(() => {
     if (!interactionRef.current.mode) {
       interactionRef.current.startCrop = normalizeCropArea(cropArea);
     }
   }, [cropArea]);
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
 
   function handlePointerMove(event: PointerEvent) {
     const imageElement = imageRef.current;
@@ -79,20 +67,12 @@ export default function ImageCropEditor({
       return;
     }
 
-    /*
-     * 마우스가 실제 이미지에서 이동한 픽셀을
-     * 이미지 기준 0~100% 좌표로 변환합니다.
-     */
     const deltaX =
       ((event.clientX - interactionRef.current.startX) / rect.width) * 100;
 
     const deltaY =
       ((event.clientY - interactionRef.current.startY) / rect.height) * 100;
 
-    /*
-     * 드래그 시작 시점의 crop을 기준으로 계속 계산합니다.
-     * 현재 cropArea를 기준으로 계산하지 않는 것이 중요합니다.
-     */
     const start = interactionRef.current.startCrop;
 
     if (interactionRef.current.mode === 'move') {
@@ -124,6 +104,7 @@ export default function ImageCropEditor({
     setIsInteracting(false);
 
     window.removeEventListener('pointermove', handlePointerMove);
+
     window.removeEventListener('pointerup', handlePointerUp);
   }
 
@@ -134,9 +115,6 @@ export default function ImageCropEditor({
     event.preventDefault();
     event.stopPropagation();
 
-    /*
-     * 드래그가 시작되는 순간의 crop 값을 고정합니다.
-     */
     interactionRef.current = {
       mode,
       startX: event.clientX,
@@ -147,10 +125,11 @@ export default function ImageCropEditor({
     setIsInteracting(true);
 
     window.addEventListener('pointermove', handlePointerMove);
+
     window.addEventListener('pointerup', handlePointerUp);
   }
 
-  const safeCrop = normalizeCropArea(cropArea);
+  const safeCrop = normalizeCropArea(cropArea ?? DEFAULT_CROP_AREA);
 
   return (
     <div className="image-crop-editor">
@@ -166,6 +145,7 @@ export default function ImageCropEditor({
         </span>
       </div>
 
+      {/* 실제 크롭 영역 조정 창 */}
       <div
         ref={canvasRef}
         className={`image-crop-editor__canvas ${
@@ -195,6 +175,7 @@ export default function ImageCropEditor({
         </div>
       </div>
 
+      {/* X / Y / W / H 직접 입력 */}
       <div className="image-crop-editor__values">
         <label>
           <span>X</span>
@@ -245,7 +226,7 @@ export default function ImageCropEditor({
 
           <input
             type="number"
-            min={MIN_SIZE}
+            min={MIN_CROP_SIZE}
             max={100}
             step={0.1}
             value={safeCrop.width.toFixed(1)}
@@ -267,7 +248,7 @@ export default function ImageCropEditor({
 
           <input
             type="number"
-            min={MIN_SIZE}
+            min={MIN_CROP_SIZE}
             max={100}
             step={0.1}
             value={safeCrop.height.toFixed(1)}

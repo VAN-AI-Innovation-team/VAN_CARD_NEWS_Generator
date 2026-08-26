@@ -103,6 +103,49 @@ public class CardGenerationService {
         return result;
     }
 
+    public CardGenerationResult regenerateCard(
+            Content content,
+            CardGenerationResult currentResult,
+            String cardType,
+            int cardIndex,
+            String instruction
+    ) {
+        List<CardGenerationRequest.InputImage> images = content.getImages().stream()
+                .map(this::toInputImage)
+                .toList();
+
+        CardGenerationRequest request = new CardGenerationRequest(
+                content.getTitle(),
+                content.getBody(),
+                content.getTemplate().getContentType().getValue(),
+                content.getTemplate().getLayoutDefinition(),
+                images
+        );
+
+        CardGenerationResult regenerated = claudeClient.regenerateCardContent(
+                request, currentResult, cardType, cardIndex, instruction
+        );
+
+        cardGenerationValidator.validateFinal(
+                regenerated, content.getTemplate().getLayoutDefinition()
+        );
+        validateSelectedImageIds(regenerated, content);
+
+        CardGenerationResult.CoverContent cover = currentResult.cover();
+        List<CardGenerationResult.ContentCard> cards = new java.util.ArrayList<>(currentResult.content());
+        CardGenerationResult.ClosingContent closing = currentResult.closing();
+
+        if ("cover".equals(cardType)) {
+            cover = regenerated.cover();
+        } else if ("content".equals(cardType)) {
+            cards.set(cardIndex, regenerated.content().get(cardIndex));
+        } else {
+            closing = regenerated.closing();
+        }
+
+        return new CardGenerationResult(cover, cards, closing);
+    }
+
     private CardGenerationRequest.InputImage toInputImage(
             ContentImage image
     ) {
@@ -139,7 +182,10 @@ public class CardGenerationService {
                         .map(ContentImage::getId)
                         .toList();
 
-        validateImageId(
+        // 이미지를 선택한 경우에만 실제 업로드 이미지인지 검증합니다.
+        // 템플릿의 image element는 이미지 선택을 지원한다는 의미이며,
+        // 이미지 자체는 선택사항이므로 imageId가 null인 경우 허용합니다.
+        validateImageIdIfPresent(
                 result.cover().imageId(),
                 imageIds,
                 "cover"
@@ -149,7 +195,7 @@ public class CardGenerationService {
              i < result.content().size();
              i++) {
 
-            validateImageId(
+            validateImageIdIfPresent(
                     result.content()
                             .get(i)
                             .imageId(),
@@ -158,10 +204,8 @@ public class CardGenerationService {
             );
         }
 
-        // closing에 이미지 요소가 있는 최신 템플릿에서는
-        // 마무리 카드도 실제 ContentImage를 참조해야 합니다.
         if (result.closing() != null) {
-            validateImageId(
+            validateImageIdIfPresent(
                     result.closing().imageId(),
                     imageIds,
                     "closing"
@@ -169,16 +213,13 @@ public class CardGenerationService {
         }
     }
 
-    private void validateImageId(
+    private void validateImageIdIfPresent(
             Long imageId,
             List<Long> imageIds,
             String cardName
     ) {
         if (imageId == null) {
-            throw new IllegalArgumentException(
-                    cardName
-                            + "에 이미지가 선택되지 않았습니다."
-            );
+            return;
         }
 
         if (!imageIds.contains(imageId)) {
