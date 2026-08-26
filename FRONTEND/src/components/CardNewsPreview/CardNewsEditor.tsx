@@ -4,12 +4,18 @@ import type {
   CardGenerationResult,
   CardImagePlacement,
   ContentPreviewResponse,
+  LayoutCard,
+  PreviewImage,
 } from '../../api/contentApi';
 
 import {
+  regenerateCard,
   updateCardImagePlacements,
   updateContentPreview,
+  updateContentTemplate,
 } from '../../api/contentApi';
+
+import { useTemplate } from '../../contexts/TemplateContext';
 
 import CardNewsPreview from './CardNewsPreview';
 import ImageCropEditor from './ImageCropEditor';
@@ -27,6 +33,9 @@ type EditableCard =
   | CardGenerationResult['content'][number]
   | CardGenerationResult['closing'];
 
+type EditableField =
+  'title' | 'body' | 'highlight' | 'date' | 'location' | 'cta';
+
 function cloneResult(result: CardGenerationResult): CardGenerationResult {
   return {
     cover: {
@@ -41,7 +50,6 @@ function cloneResult(result: CardGenerationResult): CardGenerationResult {
 
     closing: {
       ...result.closing,
-      imageId: result.closing.imageId ?? null,
       cropArea: result.closing.cropArea ? { ...result.closing.cropArea } : null,
     },
   };
@@ -68,7 +76,10 @@ function cloneResultWithPlacements(
 
     if (placement.cardType === 'content' && next.content[placement.cardIndex]) {
       next.content[placement.cardIndex].imageId = placement.imageId;
-      next.content[placement.cardIndex].cropArea = { ...placement.cropArea };
+
+      next.content[placement.cardIndex].cropArea = {
+        ...placement.cropArea,
+      };
     }
   }
 
@@ -87,11 +98,37 @@ function createEmptyContentCard(): CardGenerationResult['content'][number] {
   };
 }
 
+/**
+ * 현재 카드 인덱스에 대응하는 템플릿 레이아웃 카드를 반환합니다.
+ *
+ * 카드 인덱스 기준:
+ * - 0                 → cover
+ * - 1 ~ contentCount  → content
+ * - contentCount + 1  → closing
+ */
+function getLayoutCard(
+  template: ContentPreviewResponse['template'],
+  cardIndex: number,
+  contentCount: number,
+): LayoutCard {
+  if (cardIndex === 0) {
+    return template.layout.cards.cover;
+  }
+
+  if (cardIndex <= contentCount) {
+    return template.layout.cards.content;
+  }
+
+  return template.layout.cards.closing;
+}
+
 export default function CardNewsEditor({
   preview,
   onUpdated,
   onGenerate,
 }: CardNewsEditorProps) {
+  const { templates, reloadTemplates } = useTemplate();
+
   const [result, setResult] = useState<CardGenerationResult | null>(
     preview.cardGenerationResult
       ? cloneResultWithPlacements(
@@ -103,10 +140,23 @@ export default function CardNewsEditor({
 
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
 
+  const [editingField, setEditingField] = useState<EditableField | null>(null);
+
   const [isSaving, setIsSaving] = useState(false);
+
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const [isRegeneratingCard, setIsRegeneratingCard] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [regenerationInstruction, setRegenerationInstruction] = useState('');
+
+  useEffect(() => {
+    void reloadTemplates(preview.template.contentType);
+  }, [preview.template.contentType, reloadTemplates]);
 
   useEffect(() => {
     if (preview.cardGenerationResult) {
@@ -116,7 +166,9 @@ export default function CardNewsEditor({
           preview.cardImagePlacements,
         ),
       );
+
       setSelectedCardIndex(0);
+      setEditingField(null);
       setError(null);
     }
   }, [preview]);
@@ -139,24 +191,35 @@ export default function CardNewsEditor({
     return result.closing;
   }, [result, selectedCardIndex]);
 
-  function getSelectedLayoutCard() {
-    if (selectedCardIndex === 0) {
-      return preview.template.layout.cards.cover;
+  function getSelectedImageId(): number | null {
+    if (
+      !selectedCard ||
+      !('imageId' in selectedCard) ||
+      selectedCard.imageId == null
+    ) {
+      return null;
     }
 
-    if (selectedCardIndex <= (result?.content.length ?? 0)) {
-      return preview.template.layout.cards.content;
-    }
-
-    return preview.template.layout.cards.closing;
+    return selectedCard.imageId;
   }
 
-  function usesContentField(field: 'date' | 'location' | 'cta'): boolean {
-    const elements = getSelectedLayoutCard().elements;
+  function getSelectedCropArea() {
+    if (
+      !selectedCard ||
+      !('cropArea' in selectedCard) ||
+      !selectedCard.cropArea
+    ) {
+      return {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      };
+    }
 
-    return Object.values(elements).some(
-      (element) => element.contentField === field,
-    );
+    return {
+      ...selectedCard.cropArea,
+    };
   }
 
   function updateSelectedCard(field: string, value: string) {
@@ -172,30 +235,33 @@ export default function CardNewsEditor({
           ...next.cover,
           [field]: value,
         };
-
-        return next;
-      }
-
-      if (selectedCardIndex <= next.content.length) {
-        const contentIndex = selectedCardIndex - 1;
-
-        next.content[contentIndex] = {
-          ...next.content[contentIndex],
+      } else if (selectedCardIndex <= next.content.length) {
+        next.content[selectedCardIndex - 1] = {
+          ...next.content[selectedCardIndex - 1],
           [field]: value,
         };
-
-        return next;
+      } else {
+        next.closing = {
+          ...next.closing,
+          [field]: value,
+        };
       }
-
-      next.closing = {
-        ...next.closing,
-        [field]: value,
-      };
 
       return next;
     });
   }
 
+  /**
+   * 이미지 선택 상태 변경.
+   *
+   * 이미지 없음(null)을 선택해도
+   * select는 계속 렌더링되며,
+   * cropArea만 초기화합니다.
+   *
+   * 다시 imageId를 선택하면
+   * selectedImage 계산이 즉시 변경되어
+   * ImageCropEditor가 바로 복구됩니다.
+   */
   function updateSelectedImage(imageId: number | null) {
     setResult((current) => {
       if (!current) {
@@ -207,81 +273,17 @@ export default function CardNewsEditor({
       if (selectedCardIndex === 0) {
         next.cover.imageId = imageId;
         next.cover.cropArea = null;
+      } else if (selectedCardIndex <= next.content.length) {
+        next.content[selectedCardIndex - 1].imageId = imageId;
 
-        return next;
+        next.content[selectedCardIndex - 1].cropArea = null;
+      } else {
+        next.closing.imageId = imageId;
+        next.closing.cropArea = null;
       }
-
-      if (selectedCardIndex <= next.content.length) {
-        const contentIndex = selectedCardIndex - 1;
-
-        next.content[contentIndex].imageId = imageId;
-        next.content[contentIndex].cropArea = null;
-
-        return next;
-      }
-
-      next.closing.imageId = imageId;
-      next.closing.cropArea = null;
 
       return next;
     });
-  }
-
-  function getFieldValue(card: EditableCard, field: string): string {
-    if (field === 'title' && 'title' in card) {
-      return card.title ?? '';
-    }
-
-    if (field === 'body' && 'body' in card) {
-      return card.body ?? '';
-    }
-
-    if (field === 'highlight' && 'highlight' in card) {
-      return card.highlight ?? '';
-    }
-
-    if (field === 'date' && 'date' in card) {
-      return card.date ?? '';
-    }
-
-    if (field === 'location' && 'location' in card) {
-      return card.location ?? '';
-    }
-
-    if (field === 'cta' && 'cta' in card) {
-      return card.cta ?? '';
-    }
-
-    return '';
-  }
-
-  function getSelectedImageId(): number | null {
-    if (!selectedCard) {
-      return null;
-    }
-
-    if ('imageId' in selectedCard && selectedCard.imageId != null) {
-      return selectedCard.imageId;
-    }
-
-    return null;
-  }
-
-  function getSelectedCropArea(): NonNullable<EditableCard['cropArea']> {
-    if (
-      !selectedCard ||
-      !('cropArea' in selectedCard) ||
-      !selectedCard.cropArea
-    ) {
-      return {
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-      };
-    }
-
-    return { ...selectedCard.cropArea };
   }
 
   function updateSelectedCropArea(
@@ -295,47 +297,43 @@ export default function CardNewsEditor({
       const next = cloneResult(current);
 
       if (selectedCardIndex === 0) {
-        next.cover.cropArea = { ...cropArea };
-        return next;
+        next.cover.cropArea = {
+          ...cropArea,
+        };
+      } else if (selectedCardIndex <= next.content.length) {
+        next.content[selectedCardIndex - 1].cropArea = {
+          ...cropArea,
+        };
+      } else {
+        next.closing.cropArea = {
+          ...cropArea,
+        };
       }
 
-      if (selectedCardIndex <= next.content.length) {
-        next.content[selectedCardIndex - 1].cropArea = { ...cropArea };
-        return next;
-      }
-
-      next.closing.cropArea = { ...cropArea };
       return next;
     });
   }
 
-  function buildCropPlacements(
-    currentResult: CardGenerationResult,
+  function buildPlacements(
+    current: CardGenerationResult,
   ): CardImagePlacement[] {
     const placements: CardImagePlacement[] = [];
 
-    if (currentResult.cover.imageId != null) {
-      placements.push({
-        cardType: 'cover',
-        cardIndex: 0,
-        imageId: currentResult.cover.imageId,
-        cropArea: currentResult.cover.cropArea ?? {
-          x: 0,
-          y: 0,
-          width: 100,
-          height: 100,
-        },
-      });
-    }
-
-    currentResult.content.forEach((card, index) => {
+    const add = (
+      cardType: CardImagePlacement['cardType'],
+      cardIndex: number,
+      card: {
+        imageId: number | null;
+        cropArea: CardImagePlacement['cropArea'] | null;
+      },
+    ) => {
       if (card.imageId == null) {
         return;
       }
 
       placements.push({
-        cardType: 'content',
-        cardIndex: index,
+        cardType,
+        cardIndex,
         imageId: card.imageId,
         cropArea: card.cropArea ?? {
           x: 0,
@@ -344,39 +342,28 @@ export default function CardNewsEditor({
           height: 100,
         },
       });
+    };
+
+    add('cover', 0, current.cover);
+
+    current.content.forEach((card, index) => {
+      add('content', index, card);
     });
 
-    if (currentResult.closing.imageId != null) {
-      placements.push({
-        cardType: 'closing',
-        cardIndex: 0,
-        imageId: currentResult.closing.imageId,
-        cropArea: currentResult.closing.cropArea ?? {
-          x: 0,
-          y: 0,
-          width: 100,
-          height: 100,
-        },
-      });
-    }
+    add('closing', 0, current.closing);
 
     return placements;
   }
 
-  async function persistEditorState(
-    currentResult: CardGenerationResult,
-  ): Promise<ContentPreviewResponse> {
-    const previewWithText = await updateContentPreview(
+  async function persistEditorState(current: CardGenerationResult) {
+    const textUpdated = await updateContentPreview(preview.contentId, current);
+
+    const placementUpdated = await updateCardImagePlacements(
       preview.contentId,
-      currentResult,
+      buildPlacements(current),
     );
 
-    const updatedPreview = await updateCardImagePlacements(
-      preview.contentId,
-      buildCropPlacements(currentResult),
-    );
-
-    return updatedPreview ?? previewWithText;
+    return placementUpdated ?? textUpdated;
   }
 
   function addContentCard() {
@@ -397,8 +384,8 @@ export default function CardNewsEditor({
 
   function deleteSelectedContentCard() {
     if (
-      selectedCardIndex === 0 ||
       !result ||
+      selectedCardIndex === 0 ||
       selectedCardIndex > result.content.length
     ) {
       return;
@@ -437,14 +424,14 @@ export default function CardNewsEditor({
 
       const index = selectedCardIndex - 1;
 
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      const target = direction === 'up' ? index - 1 : index + 1;
 
-      if (targetIndex < 0 || targetIndex >= next.content.length) {
+      if (target < 0 || target >= next.content.length) {
         return next;
       }
 
-      [next.content[index], next.content[targetIndex]] = [
-        next.content[targetIndex],
+      [next.content[index], next.content[target]] = [
+        next.content[target],
         next.content[index],
       ];
 
@@ -454,16 +441,6 @@ export default function CardNewsEditor({
     setSelectedCardIndex((current) =>
       direction === 'up' ? current - 1 : current + 1,
     );
-  }
-
-  function getHighlightMaxChars(): number | undefined {
-    const elements = getSelectedLayoutCard().elements;
-    const highlightElement = Object.values(elements).find(
-      (element) =>
-        element.contentField === 'highlight' || element.role === 'highlight',
-    );
-
-    return highlightElement?.maxChars;
   }
 
   async function handleSave() {
@@ -476,15 +453,17 @@ export default function CardNewsEditor({
       setError(null);
       setSuccessMessage(null);
 
-      const updatedPreview = await persistEditorState(result);
+      const updated = await persistEditorState(result);
 
-      onUpdated(updatedPreview);
+      onUpdated(updated);
 
       setSuccessMessage('수정 내용이 저장되었습니다.');
-    } catch (saveError) {
-      console.error('카드 구성 수정 저장 실패:', saveError);
+    } catch (e) {
+      console.error(e);
 
-      setError('수정 내용을 저장하지 못했습니다.');
+      setError(
+        e instanceof Error ? e.message : '수정 내용을 저장하지 못했습니다.',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -500,19 +479,115 @@ export default function CardNewsEditor({
       setError(null);
       setSuccessMessage(null);
 
-      const updatedPreview = await persistEditorState(result);
+      const updated = await persistEditorState(result);
 
-      onUpdated(updatedPreview);
-      await onGenerate(updatedPreview);
-    } catch (generateError) {
-      console.error('카드뉴스 생성 요청 실패:', generateError);
+      onUpdated(updated);
+
+      await onGenerate(updated);
+    } catch (e) {
+      console.error(e);
+
       setError(
-        generateError instanceof Error
-          ? generateError.message
-          : '카드뉴스 생성 요청에 실패했습니다.',
+        e instanceof Error ? e.message : '카드뉴스를 생성하지 못했습니다.',
       );
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleTemplateChange(templateId: number) {
+    if (templateId === preview.template.id || isSaving || isGenerating) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const updated = await updateContentTemplate(
+        preview.contentId,
+        templateId,
+      );
+
+      onUpdated(updated);
+
+      setResult(
+        updated.cardGenerationResult
+          ? cloneResultWithPlacements(
+              updated.cardGenerationResult,
+              updated.cardImagePlacements,
+            )
+          : null,
+      );
+
+      await reloadTemplates(preview.template.contentType);
+
+      setSuccessMessage('템플릿이 변경되었습니다. 카드 내용은 유지됩니다.');
+    } catch (e) {
+      console.error(e);
+
+      setError(
+        e instanceof Error ? e.message : '템플릿을 변경하지 못했습니다.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleRegenerateCard() {
+    if (
+      !regenerationInstruction.trim() ||
+      !result ||
+      isRegeneratingCard ||
+      isSaving ||
+      isGenerating
+    ) {
+      return;
+    }
+
+    const cardType =
+      selectedCardIndex === 0
+        ? 'cover'
+        : selectedCardIndex <= result.content.length
+          ? 'content'
+          : 'closing';
+
+    const cardIndex = cardType === 'content' ? selectedCardIndex - 1 : 0;
+
+    try {
+      setIsRegeneratingCard(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const updated = await regenerateCard(preview.contentId, {
+        cardType,
+        cardIndex,
+        instruction: regenerationInstruction.trim(),
+      });
+
+      onUpdated(updated);
+
+      setResult(
+        updated.cardGenerationResult
+          ? cloneResultWithPlacements(
+              updated.cardGenerationResult,
+              updated.cardImagePlacements,
+            )
+          : null,
+      );
+
+      setRegenerationInstruction('');
+
+      setSuccessMessage('선택한 카드만 AI로 다시 작성했습니다.');
+    } catch (e) {
+      console.error(e);
+
+      setError(
+        e instanceof Error ? e.message : '카드를 다시 작성하지 못했습니다.',
+      );
+    } finally {
+      setIsRegeneratingCard(false);
     }
   }
 
@@ -523,6 +598,49 @@ export default function CardNewsEditor({
       </div>
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * 이미지 상태 검증
+   * ---------------------------------------------------------
+   *
+   * 1. selectedCard.imageId
+   * 2. preview.images
+   * 3. 현재 카드 템플릿의 image element
+   *
+   * 세 조건을 모두 만족해야 실제 이미지 편집이 가능합니다.
+   */
+
+  const selectedImageId = getSelectedImageId();
+
+  const selectedImage: PreviewImage | undefined =
+    selectedImageId !== null
+      ? preview.images.find((image) => image.id === selectedImageId)
+      : undefined;
+
+  /*
+   * 현재 선택된 카드의 실제 템플릿 레이아웃을
+   * 공통 함수로 조회합니다.
+   *
+   * 카드 인덱스:
+   * 0 → cover
+   * 1 ~ content.length → content
+   * 마지막 → closing
+   */
+  const currentLayoutCard = getLayoutCard(
+    preview.template,
+    selectedCardIndex,
+    result.content.length,
+  );
+
+  const hasTemplateImageElement = Object.values(
+    currentLayoutCard.elements,
+  ).some((element) => element.role === 'image');
+
+  const hasUsableSelectedImage =
+    selectedImageId !== null &&
+    selectedImage !== undefined &&
+    hasTemplateImageElement;
 
   return (
     <div className="card-news-editor">
@@ -536,7 +654,10 @@ export default function CardNewsEditor({
                 ? 'card-news-editor__card-button--selected'
                 : ''
             }`}
-            onClick={() => setSelectedCardIndex(index)}
+            onClick={() => {
+              setSelectedCardIndex(index);
+              setEditingField(null);
+            }}
           >
             <span>CARD {String(index + 1).padStart(2, '0')}</span>
 
@@ -559,16 +680,14 @@ export default function CardNewsEditor({
         <div className="card-news-editor__preview-panel">
           <div className="card-news-editor__preview-header">
             <div>
-              <span>LIVE PREVIEW</span>
+              <span>LIVE EDITOR</span>
 
               <strong>
                 CARD {String(selectedCardIndex + 1).padStart(2, '0')}
               </strong>
             </div>
 
-            <span>
-              {preview.template.canvasWidth} × {preview.template.canvasHeight}
-            </span>
+            <span>텍스트를 클릭해서 직접 수정</span>
           </div>
 
           <div className="card-news-editor__preview">
@@ -577,17 +696,25 @@ export default function CardNewsEditor({
               cardGenerationResult={result}
               images={preview.images}
               cardIndex={selectedCardIndex}
+              editingField={editingField}
+              onStartEdit={(field) => setEditingField(field as EditableField)}
+              onTextChange={updateSelectedCard}
+              onFinishEdit={() => setEditingField(null)}
             />
           </div>
         </div>
 
-        <div className="card-news-editor__form">
-          <div className="card-news-editor__form-header">
-            <div>
-              <h4>카드 내용 수정</h4>
-
-              <p>수정한 내용은 미리보기에 즉시 반영됩니다.</p>
+        <div className="card-news-editor__tools">
+          <div className="card-news-editor__tool-section">
+            <div className="card-news-editor__tool-header">
+              <h4>카드 편집</h4>
+              <span>직접 수정</span>
             </div>
+
+            <p className="card-news-editor__hint">
+              카드 안의 제목·본문·강조 문구·날짜·장소·CTA를 클릭하면 바로 수정할
+              수 있습니다.
+            </p>
 
             {selectedCardIndex > 0 &&
               selectedCardIndex <= result.content.length && (
@@ -597,7 +724,7 @@ export default function CardNewsEditor({
                     onClick={() => moveSelectedCard('up')}
                     disabled={selectedCardIndex === 1}
                   >
-                    ↑
+                    ↑ 앞 카드
                   </button>
 
                   <button
@@ -605,150 +732,141 @@ export default function CardNewsEditor({
                     onClick={() => moveSelectedCard('down')}
                     disabled={selectedCardIndex === result.content.length}
                   >
-                    ↓
+                    ↓ 뒤 카드
                   </button>
 
                   <button
                     type="button"
                     className="card-news-editor__delete"
-                    aria-label="선택한 카드 삭제"
-                    title="카드 삭제"
                     onClick={deleteSelectedContentCard}
                   >
-                    ×
+                    카드 삭제
                   </button>
                 </div>
               )}
           </div>
 
-          {'title' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>제목</span>
+          <div className="card-news-editor__tool-section">
+            <div className="card-news-editor__tool-header">
+              <h4>템플릿</h4>
+              <span>디자인만 변경</span>
+            </div>
 
-              <input
-                type="text"
-                value={getFieldValue(selectedCard, 'title')}
-                onChange={(event) =>
-                  updateSelectedCard('title', event.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {'body' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>본문</span>
-
-              <textarea
-                value={getFieldValue(selectedCard, 'body')}
-                onChange={(event) =>
-                  updateSelectedCard('body', event.target.value)
-                }
-                rows={8}
-              />
-            </label>
-          )}
-
-          {'highlight' in selectedCard && (
-            <label className="card-news-editor__field">
-              <div className="card-news-editor__field-header">
-                <span>강조 문구</span>
-                {getHighlightMaxChars() !== undefined && (
-                  <small>최대 {getHighlightMaxChars()}자</small>
-                )}
-              </div>
-
-              <input
-                type="text"
-                value={getFieldValue(selectedCard, 'highlight')}
-                maxLength={getHighlightMaxChars()}
-                onChange={(event) =>
-                  updateSelectedCard('highlight', event.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {usesContentField('date') && 'date' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>날짜</span>
-
-              <input
-                type="text"
-                placeholder="xxxx.xx.xx"
-                value={getFieldValue(selectedCard, 'date')}
-                onChange={(event) =>
-                  updateSelectedCard('date', event.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {usesContentField('location') && 'location' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>장소</span>
-
-              <input
-                type="text"
-                placeholder="장소를 넣어주세요"
-                value={getFieldValue(selectedCard, 'location')}
-                onChange={(event) =>
-                  updateSelectedCard('location', event.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {usesContentField('cta') && 'cta' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>CTA</span>
-
-              <input
-                type="text"
-                value={getFieldValue(selectedCard, 'cta')}
-                onChange={(event) =>
-                  updateSelectedCard('cta', event.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {'imageId' in selectedCard && (
-            <label className="card-news-editor__field">
-              <span>사용 이미지</span>
-
-              <select
-                value={getSelectedImageId() ?? ''}
-                onChange={(event) => {
-                  const value = event.target.value;
-
-                  updateSelectedImage(value === '' ? null : Number(value));
-                }}
-              >
-                <option value="">이미지 없음</option>
-
-                {preview.images.map((image, index) => (
-                  <option key={image.id} value={image.id}>
-                    이미지 {index + 1}
+            <select
+              className="card-news-editor__tool-select"
+              value={preview.template.id}
+              disabled={isSaving || isGenerating}
+              onChange={(event) =>
+                void handleTemplateChange(Number(event.target.value))
+              }
+            >
+              {templates
+                .filter(
+                  (template) =>
+                    template.contentType === preview.template.contentType,
+                )
+                .map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          )}
+            </select>
 
-          {'imageId' in selectedCard &&
-            getSelectedImageId() != null &&
-            preview.images.some(
-              (image) => image.id === getSelectedImageId(),
-            ) && (
+            <p className="card-news-editor__hint">
+              템플릿을 바꿔도 현재 카드 내용은 유지됩니다. 생성된 이미지는 새
+              템플릿 기준으로 다시 만들어야 합니다.
+            </p>
+          </div>
+
+          <div className="card-news-editor__tool-section">
+            <div className="card-news-editor__tool-header">
+              <h4>선택 카드 AI 재작성</h4>
+              <span>현재 카드만 변경</span>
+            </div>
+
+            <textarea
+              className="card-news-editor__ai-input"
+              value={regenerationInstruction}
+              onChange={(event) =>
+                setRegenerationInstruction(event.target.value)
+              }
+              placeholder="예: 본문을 더 간결하고 학생들이 이해하기 쉽게 바꿔줘"
+              rows={4}
+            />
+
+            <button
+              type="button"
+              className="card-news-editor__ai-button"
+              disabled={
+                !regenerationInstruction.trim() ||
+                isRegeneratingCard ||
+                isSaving ||
+                isGenerating
+              }
+              onClick={() => void handleRegenerateCard()}
+            >
+              {isRegeneratingCard ? 'AI 재작성 중...' : '이 카드만 AI 재작성'}
+            </button>
+          </div>
+
+          <div className="card-news-editor__tool-section card-news-editor__crop-section">
+            <div className="card-news-editor__tool-header">
+              <h4>이미지 편집</h4>
+              <span>크롭</span>
+            </div>
+
+            {/* select는 이미지가 없어도 절대 제거하지 않습니다. */}
+            <select
+              className="card-news-editor__tool-select"
+              value={selectedImageId === null ? '' : String(selectedImageId)}
+              onChange={(event) =>
+                updateSelectedImage(
+                  event.target.value === '' ? null : Number(event.target.value),
+                )
+              }
+            >
+              <option value="">이미지 없음</option>
+
+              {preview.images.map((image, index) => (
+                <option key={image.id} value={image.id}>
+                  이미지 {index + 1}
+                </option>
+              ))}
+            </select>
+
+            {/*
+             * imageId + preview.images + template image element
+             * 세 가지가 모두 유효해야 크롭 편집기를 보여줍니다.
+             *
+             * 어느 하나라도 없으면 select는 유지하고
+             * 아래 메시지를 보여줍니다.
+             */}
+            {hasUsableSelectedImage ? (
               <ImageCropEditor
-                image={preview.images.find(
-                  (image) => image.id === getSelectedImageId(),
-                )!}
+                image={selectedImage}
                 cropArea={getSelectedCropArea()}
                 onChange={updateSelectedCropArea}
               />
+            ) : (
+              <div className="card-news-editor__no-image">
+                이미지가 존재하지 않습니다.
+              </div>
             )}
+
+            {/*
+             * 디버깅/상태 검증용 정보.
+             * 사용자에게 불필요하게 보이지 않도록
+             * 화면에는 표시하지 않고 DOM attribute로만 남깁니다.
+             */}
+            <div
+              hidden
+              data-selected-image-id={selectedImageId ?? ''}
+              data-preview-image-found={selectedImage ? 'true' : 'false'}
+              data-template-image-element={
+                hasTemplateImageElement ? 'true' : 'false'
+              }
+            />
+          </div>
 
           {error && <p className="card-news-editor__error">{error}</p>}
 

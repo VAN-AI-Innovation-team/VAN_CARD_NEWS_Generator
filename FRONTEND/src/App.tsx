@@ -27,6 +27,7 @@ import {
   editContent,
   fetchContentPreview,
   generateCardImages,
+  fetchGeneratedCardImages,
   type GeneratedCardImageResponse,
   type ContentPreviewResponse,
 } from './api/contentApi';
@@ -61,7 +62,7 @@ function AppContent() {
   const [selectedManagedContent, setSelectedManagedContent] =
     useState<ContentManagementListItem | null>(null);
 
-  const [message, setMessage] = useState('연동 확인 중...');
+  const [serverConnected, setServerConnected] = useState<boolean | null>(null);
 
   const [selectedContentType, setSelectedContentType] =
     useState<ContentType | null>(null);
@@ -99,17 +100,70 @@ function AppContent() {
 
   async function checkBackendConnection() {
     try {
-      const response = await axios.get('/api/health');
+      await axios.get('/api/health');
 
-      setMessage(response.data.message);
+      setServerConnected(true);
     } catch (error) {
       console.error('백엔드 통신 오류:', error);
-      setMessage('백엔드 연결 실패');
+      setServerConnected(false);
+    }
+  }
+
+  const ACTIVE_CONTENT_ID_KEY = 'van-card-news-active-content-id';
+
+  async function restoreActiveContent() {
+    const params = new URLSearchParams(window.location.search);
+    const queryId = Number(params.get('contentId'));
+    const storedId = Number(localStorage.getItem(ACTIVE_CONTENT_ID_KEY));
+    const contentId =
+      Number.isInteger(queryId) && queryId > 0 ? queryId : storedId;
+
+    if (!Number.isInteger(contentId) || contentId <= 0) {
+      return;
+    }
+
+    try {
+      const restoredPreview = await fetchContentPreview(contentId);
+
+      if (!restoredPreview.cardGenerationResult) {
+        return;
+      }
+
+      setPreview(restoredPreview);
+      setSelectedContentType(
+        restoredPreview.template.contentType as ContentType,
+      );
+      setSelectedTemplateId(restoredPreview.template.id);
+      setEditingContentId(contentId);
+      setPostData({
+        title: restoredPreview.title,
+        body: restoredPreview.body,
+        images: [],
+        existingImageIds: restoredPreview.images.map((image) => image.id),
+      });
+      setEditingExistingImages(
+        restoredPreview.images.map((image) => ({
+          id: image.id,
+          imageUrl: image.imageUrl,
+        })),
+      );
+
+      const restoredImages = await fetchGeneratedCardImages(contentId);
+      setGeneratedImages(restoredImages);
+      setStep(restoredImages.length > 0 ? 5 : 4);
+      setScreen('create');
+
+      localStorage.setItem(ACTIVE_CONTENT_ID_KEY, String(contentId));
+      window.history.replaceState(null, '', `/?contentId=${contentId}`);
+    } catch (error) {
+      console.error('기존 생성 결과 복원 실패:', error);
+      localStorage.removeItem(ACTIVE_CONTENT_ID_KEY);
     }
   }
 
   useEffect(() => {
     void checkBackendConnection();
+    void restoreActiveContent();
   }, []);
 
   function handleNextFromContentType() {
@@ -172,6 +226,14 @@ function AppContent() {
           });
 
       const previewData = await waitForPreview(response.contentId);
+
+      localStorage.setItem(ACTIVE_CONTENT_ID_KEY, String(response.contentId));
+
+      window.history.replaceState(
+        null,
+        '',
+        `/?contentId=${response.contentId}`,
+      );
 
       setPreview(previewData);
       setGeneratedImages([]);
@@ -266,6 +328,8 @@ function AppContent() {
   }
 
   function handleStartNewContent() {
+    localStorage.removeItem(ACTIVE_CONTENT_ID_KEY);
+    window.history.replaceState(null, '', window.location.pathname);
     setStep(1);
     setSelectedContentType(null);
     setPostData(null);
@@ -295,24 +359,30 @@ function AppContent() {
           </div>
 
           <div className="app-header__actions">
-            <div className="connection-status">
+            <div className="connection-status" aria-live="polite">
               <span
                 className={`connection-status__dot ${
-                  message === '연동 확인 중...'
+                  serverConnected === null
                     ? 'connection-status__dot--loading'
-                    : message === '백엔드 연결 실패'
-                      ? 'connection-status__dot--error'
-                      : 'connection-status__dot--success'
+                    : serverConnected
+                      ? 'connection-status__dot--success'
+                      : 'connection-status__dot--error'
                 }`}
               />
 
-              <span className="connection-status__text">{message}</span>
+              <span className="connection-status__text">
+                {serverConnected === null
+                  ? '서버 확인 중'
+                  : serverConnected
+                    ? '서버 연결 원활'
+                    : '서버 연결 실패'}
+              </span>
 
-              {message === '백엔드 연결 실패' && (
+              {serverConnected === false && (
                 <button
                   type="button"
                   className="connection-status__button"
-                  onClick={checkBackendConnection}
+                  onClick={() => void checkBackendConnection()}
                 >
                   다시 확인
                 </button>
@@ -336,6 +406,7 @@ function AppContent() {
             <aside className="app-sidebar">
               <div className="app-sidebar__header">
                 <strong>메뉴</strong>
+
                 <button
                   type="button"
                   aria-label="메뉴 닫기"
@@ -344,6 +415,7 @@ function AppContent() {
                   ×
                 </button>
               </div>
+
               <button
                 type="button"
                 className={`app-sidebar__item ${
@@ -378,6 +450,7 @@ function AppContent() {
                 <span>검수 · 승인</span>
                 <small>승인 요청 작업물 확인</small>
               </button>
+
               <button
                 type="button"
                 className={`app-sidebar__item ${
@@ -420,7 +493,6 @@ function AppContent() {
 
                 <div className="step-item__content">
                   <span className="step-item__label">콘텐츠 유형</span>
-
                   <span className="step-item__description">제작 목적 선택</span>
                 </div>
               </div>
@@ -436,7 +508,6 @@ function AppContent() {
 
                 <div className="step-item__content">
                   <span className="step-item__label">콘텐츠 작성</span>
-
                   <span className="step-item__description">
                     제목·본문·사진 입력
                   </span>
@@ -454,7 +525,6 @@ function AppContent() {
 
                 <div className="step-item__content">
                   <span className="step-item__label">템플릿 선택</span>
-
                   <span className="step-item__description">
                     추천 템플릿 확인
                   </span>
@@ -472,7 +542,6 @@ function AppContent() {
 
                 <div className="step-item__content">
                   <span className="step-item__label">카드 구성 확인</span>
-
                   <span className="step-item__description">카드 내용 수정</span>
                 </div>
               </div>
@@ -486,7 +555,6 @@ function AppContent() {
 
                 <div className="step-item__content">
                   <span className="step-item__label">생성 결과</span>
-
                   <span className="step-item__description">최종 결과 확인</span>
                 </div>
               </div>

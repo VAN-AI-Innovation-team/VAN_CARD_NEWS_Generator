@@ -123,6 +123,10 @@ public class Content {
         this.cardGenerationResult = cardGenerationResult;
     }
 
+    public void updateTemplate(Template template) {
+        this.template = template;
+    }
+
     // 2번 필드 업데이트 메서드
     public void updateCardImagePlacements(JsonNode cardImagePlacements) {
         this.cardImagePlacements = cardImagePlacements;

@@ -19,6 +19,10 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /web
 
+# 한글을 포함한 CJK 문자가 이미지 렌더링 시
+# 네모(□)로 표시되지 않도록 Noto CJK 폰트를 설치합니다.
+RUN apk add --no-cache font-noto-cjk
+
 # 웹을 root가 아닌 권한이 제한된 별도 사용자로 실행합니다.
 RUN addgroup --system spring \
     && adduser --system --ingroup spring spring

@@ -30,7 +30,6 @@ export interface LayoutElement {
   typographyToken?: string;
   cropRatio?: string;
   shape?: string;
-  /** 템플릿이 실제 카드 데이터에서 값을 가져올 필드입니다. */
   contentField?: 'title' | 'body' | 'highlight' | 'date' | 'location' | 'cta';
 }
 
@@ -115,6 +114,18 @@ export interface GeneratedCardImageResponse {
   height: number | null;
 }
 
+export interface CardImagePlacement {
+  cardType: 'cover' | 'content' | 'closing';
+  cardIndex: number;
+  imageId: number;
+  cropArea: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
 export interface ContentPreviewResponse {
   contentId: number;
   title: string;
@@ -180,6 +191,7 @@ export async function editContent(
   payload: EditContentPayload,
 ): Promise<CreateContentResponse> {
   const formData = new FormData();
+
   formData.append(
     'data',
     new Blob(
@@ -191,19 +203,55 @@ export async function editContent(
           keepImageIds: payload.keepImageIds,
         }),
       ],
-      { type: 'application/json' },
+      {
+        type: 'application/json',
+      },
     ),
   );
-  payload.images.forEach((image) => formData.append('images', image));
+
+  payload.images.forEach((image) => {
+    formData.append('images', image);
+  });
 
   const response = await axios.put<CreateContentResponse>(
     `/api/contents/${contentId}/edit`,
     formData,
   );
+
   return response.data;
 }
 
 export type HighlightCardType = 'COVER' | 'CONTENT';
+
+export async function updateContentTemplate(
+  contentId: number,
+  templateId: number,
+): Promise<ContentPreviewResponse> {
+  const response = await axios.put<ContentPreviewResponse>(
+    `/api/contents/${contentId}/template`,
+    { templateId },
+  );
+
+  return response.data;
+}
+
+export interface CardRegenerationPayload {
+  cardType: 'cover' | 'content' | 'closing';
+  cardIndex: number;
+  instruction: string;
+}
+
+export async function regenerateCard(
+  contentId: number,
+  payload: CardRegenerationPayload,
+): Promise<ContentPreviewResponse> {
+  const response = await axios.post<ContentPreviewResponse>(
+    `/api/contents/${contentId}/cards/regenerate`,
+    payload,
+  );
+
+  return response.data;
+}
 
 export interface HighlightUpdatePayload {
   cardType: HighlightCardType;
@@ -223,18 +271,131 @@ export async function updateCardHighlight(
   return response.data;
 }
 
+/**
+ * 조사 '이/가'를 문법에 맞게 선택합니다.
+ */
+function getSubjectParticle(word: string): '이' | '가' {
+  if (!word) {
+    return '이';
+  }
+
+  const lastChar = word.charCodeAt(word.length - 1);
+
+  if (lastChar >= 0xac00 && lastChar <= 0xd7a3) {
+    return (lastChar - 0xac00) % 28 === 0 ? '가' : '이';
+  }
+
+  return '가';
+}
+
+/**
+ * 백엔드 validation 에러를
+ * 카드 번호 기준 메시지로 변환합니다.
+ */
+function formatContentValidationError(message: string): string {
+  const contentFieldMatch = message.match(
+    /content\[(\d+)\]\.(title|body|highlight|date|location|cta)/,
+  );
+
+  if (contentFieldMatch) {
+    const contentIndex = Number(contentFieldMatch[1]);
+
+    const field = contentFieldMatch[2];
+
+    const cardNumber = contentIndex + 2;
+
+    const fieldNames: Record<string, string> = {
+      title: '제목',
+      body: '본문',
+      highlight: '강조 문구',
+      date: '날짜',
+      location: '장소',
+      cta: 'CTA',
+    };
+
+    const fieldName = fieldNames[field] ?? field;
+
+    const particle = getSubjectParticle(fieldName);
+
+    return `${cardNumber}번 카드의 ${fieldName}${particle} 비어 있습니다. 내용을 입력해주세요.`;
+  }
+
+  const coverFieldMatch = message.match(
+    /cover\.(title|body|highlight|date|location|cta)/,
+  );
+
+  if (coverFieldMatch) {
+    const field = coverFieldMatch[1];
+
+    const fieldNames: Record<string, string> = {
+      title: '제목',
+      body: '본문',
+      highlight: '강조 문구',
+      date: '날짜',
+      location: '장소',
+      cta: 'CTA',
+    };
+
+    const fieldName = fieldNames[field] ?? field;
+
+    const particle = getSubjectParticle(fieldName);
+
+    return `1번 카드의 ${fieldName}${particle} 비어 있습니다. 내용을 입력해주세요.`;
+  }
+
+  const closingFieldMatch = message.match(
+    /closing\.(title|body|highlight|date|location|cta)/,
+  );
+
+  if (closingFieldMatch) {
+    const field = closingFieldMatch[1];
+
+    const fieldNames: Record<string, string> = {
+      title: '제목',
+      body: '본문',
+      highlight: '강조 문구',
+      date: '날짜',
+      location: '장소',
+      cta: 'CTA',
+    };
+
+    const fieldName = fieldNames[field] ?? field;
+
+    const particle = getSubjectParticle(fieldName);
+
+    return `마지막 카드의 ${fieldName}${particle} 비어 있습니다. 내용을 입력해주세요.`;
+  }
+
+  return message;
+}
+
 export async function updateContentPreview(
   contentId: number,
   cardGenerationResult: CardGenerationResult,
 ): Promise<ContentPreviewResponse> {
-  const response = await axios.put<ContentPreviewResponse>(
-    `/api/contents/${contentId}/preview`,
-    {
-      cardGenerationResult,
-    },
-  );
+  try {
+    const response = await axios.put<ContentPreviewResponse>(
+      `/api/contents/${contentId}/preview`,
+      {
+        cardGenerationResult,
+      },
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const serverMessage =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data?.message;
+
+      if (typeof serverMessage === 'string' && serverMessage.trim()) {
+        throw new Error(formatContentValidationError(serverMessage));
+      }
+    }
+
+    throw error;
+  }
 }
 
 export async function updateCardImagePlacements(
@@ -249,18 +410,6 @@ export async function updateCardImagePlacements(
   );
 
   return response.data;
-}
-
-export interface CardImagePlacement {
-  cardType: 'cover' | 'content' | 'closing';
-  cardIndex: number;
-  imageId: number;
-  cropArea: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
 }
 
 export async function generateCardImages(
@@ -279,6 +428,7 @@ export async function fetchGeneratedCardImages(
   const response = await axios.get<GeneratedCardImageResponse[]>(
     `/api/contents/${contentId}/generated-images`,
   );
+
   return response.data;
 }
 
@@ -314,5 +464,6 @@ export async function fetchContentManagementList(): Promise<
 > {
   const response =
     await axios.get<ContentManagementListItem[]>('/api/contents');
+
   return response.data;
 }

@@ -2,33 +2,39 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+
+  /*
+   * sticky가 상위 요소의 overflow에 의해 잘리지 않도록
+   * 자체적으로 overflow를 만들지 않습니다.
+   */
+  width: 100%;
+  min-width: 0;
 }
 
 .card-news-editor__cards {
   display: flex;
   flex-wrap: wrap;
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 2px;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
-.card-news-editor__card-button {
+.card-news-editor__card-button,
+.card-news-editor__add-card {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-
-  border: 1px solid #dce2ea;
-  background: #ffffff;
-
   padding: 9px 12px;
   border-radius: 8px;
-
   font-size: 12px;
   font-weight: 700;
-
   cursor: pointer;
+  box-sizing: border-box;
+}
+
+.card-news-editor__card-button {
+  border: 1px solid #dce2ea;
+  background: #fff;
 }
 
 .card-news-editor__card-button small {
@@ -39,46 +45,71 @@
 .card-news-editor__card-button--selected {
   border-color: #173d73;
   background: #173d73;
-  color: #ffffff;
+  color: #fff;
 }
 
 .card-news-editor__add-card {
   border: 1px dashed #aab5c5;
-  background: #ffffff;
-
-  padding: 9px 12px;
-  border-radius: 8px;
-
+  background: #fff;
   color: #173d73;
-  font-size: 12px;
-  font-weight: 700;
-
-  cursor: pointer;
 }
 
+/*
+ * PC:
+ * 왼쪽 미리보기 + 오른쪽 편집 도구
+ */
 .card-news-editor__workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
-  gap: 40px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  gap: 28px;
   align-items: start;
+
+  width: 100%;
+  min-width: 0;
+
+  /*
+   * sticky 요소가 이 영역에서 정상적으로 동작하도록
+   * overflow를 지정하지 않습니다.
+   */
+  overflow: visible;
 }
 
-.card-news-editor__preview-panel {
-  min-width: 0;
-  padding: 20px;
-
+.card-news-editor__preview-panel,
+.card-news-editor__tools {
   border: 1px solid #e4e8ef;
   border-radius: 16px;
+  background: #fff;
+  box-sizing: border-box;
+  min-width: 0;
+}
 
+/*
+ * PC 미리보기 sticky
+ *
+ * 오른쪽 편집 도구를 아래로 스크롤해도
+ * 왼쪽 미리보기는 화면에 계속 남습니다.
+ */
+.card-news-editor__preview-panel {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  z-index: 10;
+
+  padding: 20px;
   background: #f7f8fa;
+
+  /*
+   * sticky 내부에서 내용이 잘리지 않도록 합니다.
+   */
+  overflow: visible;
 }
 
 .card-news-editor__preview-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+  gap: 12px;
 }
 
 .card-news-editor__preview-header > div {
@@ -102,158 +133,168 @@
 .card-news-editor__preview {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-
-  width: 100%;
+  min-width: 0;
 }
 
 .card-news-editor__preview .card-news-preview {
-  width: min(100%, 560px);
+  width: min(100%, 620px);
+  max-width: 100%;
   box-shadow: 0 16px 40px rgba(23, 32, 51, 0.14);
 }
 
-.card-news-editor__form {
+/*
+ * 오른쪽 편집 영역
+ */
+.card-news-editor__tools {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  padding: 20px;
 
-  padding: 24px;
-
-  border: 1px solid #e4e8ef;
-  border-radius: 16px;
-
-  background: #ffffff;
+  min-width: 0;
 }
 
-.card-news-editor__form-header {
+.card-news-editor__tool-section {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e8ebf0;
+  min-width: 0;
 }
 
-.card-news-editor__form-header h4 {
-  margin: 0;
+.card-news-editor__tool-section:last-of-type {
+  border-bottom: 0;
+}
 
-  font-size: 18px;
+.card-news-editor__tool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-news-editor__tool-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #172033;
+}
+
+.card-news-editor__tool-header span {
+  font-size: 10px;
+  color: #173d73;
   font-weight: 800;
 }
 
-.card-news-editor__form-header p {
-  margin: 6px 0 0;
-
+.card-news-editor__hint {
+  margin: 0;
   color: #68758a;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .card-news-editor__move-buttons {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .card-news-editor__move-buttons button {
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-
+  padding: 8px 10px;
   border: 1px solid #dce2ea;
   border-radius: 7px;
-
-  background: #ffffff;
-
-  font-size: 13px;
+  background: #fff;
+  color: #344056;
+  font-size: 11px;
   font-weight: 700;
-
   cursor: pointer;
 }
 
 .card-news-editor__move-buttons button:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .card-news-editor__move-buttons .card-news-editor__delete {
   color: #c62828;
-  padding: 0;
-  font-size: 20px;
-  line-height: 1;
 }
 
-.card-news-editor__field-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.card-news-editor__tool-select,
+.card-news-editor__ai-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dce2ea;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  min-width: 0;
 }
 
-.card-news-editor__field-header small {
-  color: #7b8494;
+.card-news-editor__ai-input {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.card-news-editor__ai-button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 14px;
+  background: #173d73;
+  color: #fff;
   font-size: 12px;
-  font-weight: 600;
-}
-
-.card-news-editor__highlight-save {
-  align-self: flex-end;
-  border: 1px solid #173d73;
-  border-radius: 7px;
-  padding: 8px 12px;
-  background: #ffffff;
-  color: #173d73;
-  font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.card-news-editor__highlight-save:disabled {
-  opacity: 0.5;
-  cursor: default;
+.card-news-editor__ai-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.card-news-editor__field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.card-news-editor__crop-section {
+  min-width: 0;
 }
 
-.card-news-editor__field > span {
-  font-size: 13px;
-  font-weight: 700;
-  color: #172033;
-}
-
-.card-news-editor__field input,
-.card-news-editor__field textarea,
-.card-news-editor__field select {
+.card-news-editor__crop-section .image-crop-editor {
   width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.card-news-editor__crop-section .image-crop-editor__canvas {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 320px;
   box-sizing: border-box;
-
-  border: 1px solid #dce2ea;
-  border-radius: 8px;
-
-  padding: 11px 12px;
-
-  background: #ffffff;
-
-  font: inherit;
-  color: #172033;
 }
 
-.card-news-editor__field textarea {
-  resize: vertical;
-  line-height: 1.6;
+.card-news-editor__no-image {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 1px dashed #dce2ea;
+  border-radius: 10px;
+  background: #f7f8fa;
+  color: #8a95a6;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
 }
 
-.card-news-editor__field input:focus,
-.card-news-editor__field textarea:focus,
-.card-news-editor__field select:focus {
-  outline: none;
-  border-color: #173d73;
-  box-shadow: 0 0 0 3px rgba(23, 61, 115, 0.08);
-}
-
+/*
+ * 에러 / 성공 메시지
+ */
 .card-news-editor__error {
   margin: 0;
-
   color: #c62828;
   font-size: 13px;
 }
@@ -261,24 +302,35 @@
 .card-news-editor__success {
   margin: 0;
   color: #2e7d32;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/*
+ * 하단 버튼
+ */
+.card-news-editor__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .card-news-editor__save {
   width: 100%;
-
   border: 0;
   border-radius: 9px;
-
   padding: 14px 16px;
-
   background: #173d73;
-  color: #ffffff;
-
+  color: #fff;
   font-weight: 800;
-
   cursor: pointer;
+  box-sizing: border-box;
+}
+
+.card-news-editor__save--secondary {
+  border: 1px solid #dce2ea;
+  background: #fff;
+  color: #173d73;
 }
 
 .card-news-editor__save:disabled {
@@ -288,37 +340,61 @@
 
 .card-news-editor__empty {
   padding: 60px 20px;
-
   text-align: center;
   color: #68758a;
 }
 
-@media (max-width: 900px) {
+/*
+ * ----------------------------------------
+ * 태블릿
+ * ----------------------------------------
+ *
+ * 1000px 이하에서는 1열로 변경합니다.
+ *
+ * 태블릿에서는 기존처럼 일반 흐름으로 표시합니다.
+ * 모바일에서만 미리보기를 고정합니다.
+ */
+@media (max-width: 1000px) {
   .card-news-editor__workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
   }
 
   .card-news-editor__preview-panel {
+    position: static;
+    top: auto;
+    z-index: auto;
     order: 1;
   }
 
-  .card-news-editor__form {
+  .card-news-editor__tools {
     order: 2;
+  }
+
+  .card-news-editor__preview .card-news-preview {
+    width: min(100%, 620px);
+  }
+
+  .card-news-editor__crop-section .image-crop-editor__canvas {
+    min-height: 300px;
   }
 }
 
-.card-news-editor__actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.card-news-editor__save--secondary {
-  border: 1px solid #dce2ea;
-  background: #ffffff;
-  color: #173d73;
-}
-
+/*
+ * ----------------------------------------
+ * 모바일
+ * ----------------------------------------
+ *
+ * 모바일에서는 카드 미리보기를 sticky로 유지합니다.
+ *
+ * 사용자가 이미지 크롭 영역까지 아래로 스크롤해도
+ * 현재 선택한 카드의 실제 미리보기는 화면 상단에
+ * 계속 남아 있습니다.
+ *
+ * CardNewsPreview는 result의 cropArea를 그대로 사용하므로
+ * 크롭 영역을 움직일 때 이 sticky 미리보기 역시
+ * 즉시 실제 카드 적용 결과로 갱신됩니다.
+ */
 @media (max-width: 640px) {
   .card-news-editor {
     gap: 16px;
@@ -327,7 +403,15 @@
   .card-news-editor__cards {
     flex-wrap: nowrap;
     overflow-x: auto;
-    scrollbar-width: thin;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+
+    /*
+     * 모바일 가로 스크롤 영역이
+     * 세로 레이아웃을 깨지 않도록 합니다.
+     */
+    width: 100%;
+    max-width: 100%;
   }
 
   .card-news-editor__card-button,
@@ -337,36 +421,81 @@
   }
 
   .card-news-editor__workspace {
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+    width: 100%;
   }
 
   .card-news-editor__preview-panel,
-  .card-news-editor__form {
-    padding: 16px;
+  .card-news-editor__tools {
+    width: 100%;
+    min-width: 0;
+    padding: 14px;
     border-radius: 12px;
   }
 
+  /*
+   * ★ 모바일 핵심
+   *
+   * 기존 position: static을 제거하고 sticky를 사용합니다.
+   *
+   * 이미지 크롭 도구를 아래로 스크롤해도
+   * 현재 카드 미리보기가 viewport 상단에 고정됩니다.
+   */
+  .card-news-editor__preview-panel {
+    position: sticky;
+    top: 8px;
+    z-index: 20;
+    align-self: start;
+
+    background: #f7f8fa;
+
+    /*
+     * 모바일에서 sticky 카드가 다른 영역에 묻히지 않도록
+     * 충분한 그림자를 추가합니다.
+     */
+    box-shadow: 0 8px 24px rgba(23, 32, 51, 0.12);
+  }
+
   .card-news-editor__preview-header {
-    gap: 8px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
     margin-bottom: 14px;
   }
 
   .card-news-editor__preview-header > div {
-    min-width: 0;
+    gap: 8px;
   }
 
-  .card-news-editor__preview-header span:last-child {
-    white-space: nowrap;
-    font-size: 10px;
+  .card-news-editor__preview .card-news-preview {
+    width: 100%;
+    max-width: 100%;
   }
 
-  .card-news-editor__form-header {
-    flex-direction: column;
+  .card-news-editor__tools {
+    gap: 16px;
+  }
+
+  .card-news-editor__tool-section {
+    padding-bottom: 16px;
+  }
+
+  .card-news-editor__tool-header h4 {
+    font-size: 15px;
   }
 
   .card-news-editor__move-buttons {
     width: 100%;
-    flex-wrap: wrap;
+  }
+
+  .card-news-editor__move-buttons button {
+    flex: 1 1 auto;
+  }
+
+  .card-news-editor__crop-section .image-crop-editor__canvas {
+    width: 100%;
+    min-height: 260px;
   }
 
   .card-news-editor__actions {
@@ -374,17 +503,29 @@
   }
 }
 
-@media (max-width: 420px) {
+/*
+ * ----------------------------------------
+ * 아주 작은 모바일
+ * ----------------------------------------
+ */
+@media (max-width: 400px) {
   .card-news-editor__preview-panel,
-  .card-news-editor__form {
+  .card-news-editor__tools {
     padding: 12px;
   }
 
-  .card-news-editor__form-header h4 {
-    font-size: 16px;
+  /*
+   * 아주 작은 화면에서도 미리보기는 계속 상단 고정합니다.
+   */
+  .card-news-editor__preview-panel {
+    top: 6px;
   }
 
-  .card-news-editor__form-header p {
-    font-size: 12px;
+  .card-news-editor__preview-header strong {
+    font-size: 14px;
+  }
+
+  .card-news-editor__crop-section .image-crop-editor__canvas {
+    min-height: 220px;
   }
 }

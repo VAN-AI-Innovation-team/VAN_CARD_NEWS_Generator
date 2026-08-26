@@ -7,6 +7,8 @@ import com.van.cardnews.domain.content.dto.request.CardImagePlacementUpdateReque
 import com.van.cardnews.domain.content.dto.request.ContentCreateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentEditRequest;
 import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
+import com.van.cardnews.domain.content.dto.request.ContentTemplateUpdateRequest;
+import com.van.cardnews.domain.content.dto.request.CardRegenerationRequest;
 import com.van.cardnews.domain.content.dto.request.HighlightUpdateRequest;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
@@ -17,6 +19,7 @@ import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import com.van.cardnews.domain.generation.service.CardGenerationValidator;
+import com.van.cardnews.domain.generation.service.CardGenerationService;
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
 import com.van.cardnews.domain.jobhistory.entity.JobType;
 import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
@@ -50,6 +53,7 @@ public class ContentService {
     private final ApplicationEventPublisher eventPublisher;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final GeneratedCardImageRepository generatedCardImageRepository;
+    private final CardGenerationService cardGenerationService;
 
     @Transactional
     public ContentCreateResponse createContent(
@@ -174,6 +178,105 @@ public class ContentService {
     }
 
     @Transactional
+    public ContentPreviewResponse updateTemplate(
+            Long contentId,
+            ContentTemplateUpdateRequest request
+    ) {
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        Template template = templateRepository.findByIdAndActiveTrue(request.templateId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TEMPLATE_NOT_FOUND));
+
+        if (content.getTemplate().getContentType() != template.getContentType()) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "현재 콘텐츠 유형과 다른 템플릿은 선택할 수 없습니다."
+            );
+        }
+
+        if (content.getCardGenerationResult() == null) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "아직 카드 구성 결과가 생성되지 않았습니다."
+            );
+        }
+
+        CardGenerationResult result = objectMapper.convertValue(
+                content.getCardGenerationResult(),
+                CardGenerationResult.class
+        );
+
+        try {
+            CardGenerationValidator.validateJson(
+                    result,
+                    template.getLayoutDefinition()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "현재 카드 내용이 선택한 템플릿에 맞지 않습니다: " + e.getMessage()
+            );
+        }
+
+        content.updateTemplate(template);
+        content.updateCardImagePlacements(objectMapper.createArrayNode());
+        generatedCardImageRepository.deleteByContent_Id(contentId);
+
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
+    }
+
+    @Transactional
+    public ContentPreviewResponse regenerateCard(
+            Long contentId,
+            CardRegenerationRequest request
+    ) {
+        Content content = contentRepository.findByIdWithImages(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        if (content.getCardGenerationResult() == null) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "아직 카드 구성 결과가 생성되지 않았습니다."
+            );
+        }
+
+        String cardType = request.cardType().trim().toLowerCase();
+        if (!cardType.equals("cover") && !cardType.equals("content") && !cardType.equals("closing")) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "지원하지 않는 카드 유형입니다.");
+        }
+
+        CardGenerationResult current = objectMapper.convertValue(
+                content.getCardGenerationResult(),
+                CardGenerationResult.class
+        );
+
+        if (cardType.equals("content") &&
+                (request.cardIndex() < 0 || request.cardIndex() >= current.content().size())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "존재하지 않는 본문 카드입니다.");
+        }
+        if (!cardType.equals("content") && request.cardIndex() != 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "표지/마무리 카드의 인덱스는 0이어야 합니다.");
+        }
+
+        CardGenerationResult regenerated = cardGenerationService.regenerateCard(
+                content, current, cardType, request.cardIndex(), request.instruction().trim()
+        );
+
+        content.updateCardGenerationResult(objectMapper.valueToTree(regenerated));
+        content.updateCardImagePlacements(objectMapper.createArrayNode());
+        generatedCardImageRepository.deleteByContent_Id(contentId);
+
+        return ContentPreviewResponse.from(
+                content,
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+        );
+    }
+
+    @Transactional
     public ContentPreviewResponse updateHighlight(
             Long contentId,
             HighlightUpdateRequest request
@@ -228,6 +331,7 @@ public class ContentService {
         }
 
         content.updateCardGenerationResult(updated);
+        generatedCardImageRepository.deleteByContent_Id(contentId);
 
         return ContentPreviewResponse.from(
                 content,
@@ -274,6 +378,8 @@ public class ContentService {
         content.updateCardGenerationResult(
                 request.cardGenerationResult()
         );
+        generatedCardImageRepository.deleteByContent_Id(contentId);
+        content.updateCardImagePlacements(objectMapper.createArrayNode());
 
         return ContentPreviewResponse.from(
                 content,
@@ -355,6 +461,7 @@ public class ContentService {
 
         content.updateCardImagePlacements(placements);
         content.updateCardGenerationResult(updatedResult);
+        generatedCardImageRepository.deleteByContent_Id(contentId);
 
         return ContentPreviewResponse.from(
                 content,
