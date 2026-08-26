@@ -3,8 +3,11 @@ package com.van.cardnews.domain.content.repository;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,5 +32,28 @@ public interface ContentRepository extends JpaRepository<Content, Long> {
             @Param("contentId") Long contentId
     );
 
+    /**
+     * 콘텐츠 목록 조회
+     */
     List<Content> findByStatusNotOrderByCreatedAtDesc(ContentStatus status);
+
+    /**
+     * 승인 요청 생성용 비관적 쓰기 잠금입니다.
+     *
+     * 동일 콘텐츠에 동시에 승인 요청이 들어오는 경우
+     * 한 트랜잭션이 Content row를 먼저 잠그고,
+     * 트랜잭션이 종료될 때까지 다른 승인 요청이 대기하도록 합니다.
+     *
+     * Service의 PENDING 중복 검사와 함께 사용하여
+     * race condition으로 인한 중복 승인 요청 생성을 방지합니다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select c
+            from Content c
+            where c.id = :contentId
+            """)
+    Optional<Content> findByIdForApproval(
+            @Param("contentId") Long contentId
+    );
 }
