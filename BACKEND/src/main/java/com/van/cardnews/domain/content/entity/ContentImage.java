@@ -112,6 +112,18 @@ public class ContentImage {
     }
 
     /**
+     * 콘텐츠 복제 시 원본 입력 이미지 정보를 복사합니다.
+     * 생성 결과 관련 필드는 복제하지 않아 새 콘텐츠에서 재생성할 수 있습니다.
+     */
+    public static ContentImage copyOf(ContentImage source, int sortOrder) {
+        return ContentImage.builder()
+                .imageUrl(source.imageUrl)
+                .cropArea(source.cropArea)
+                .sortOrder(sortOrder)
+                .build();
+    }
+
+    /**
      * 크롭 정보와 생성 이미지 결과를 저장합니다.
      */
     public void updateGenerationResult(
