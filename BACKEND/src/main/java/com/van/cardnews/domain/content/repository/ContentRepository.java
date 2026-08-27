@@ -9,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +39,12 @@ public interface ContentRepository extends JpaRepository<Content, Long> {
      * 콘텐츠 목록 조회
      */
     List<Content> findByStatusNotOrderByCreatedAtDesc(ContentStatus status);
+
+    /**
+     * 콘텐츠 이력 페이징 조회입니다.
+     * ARCHIVED 콘텐츠는 기존 목록 정책과 동일하게 제외합니다.
+     */
+    Page<Content> findByStatusNot(ContentStatus status, Pageable pageable);
 
     /**
      * 승인 요청 생성용 비관적 쓰기 잠금입니다.

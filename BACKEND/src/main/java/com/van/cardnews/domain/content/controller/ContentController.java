@@ -29,6 +29,19 @@ public class ContentController {
     private final ContentService contentService;
 
     /**
+     * 기존 콘텐츠를 동일 입력값으로 복제합니다.
+     * regenerate=true이면 복제 직후 전체 카드뉴스 생성 파이프라인을 실행합니다.
+     */
+    @PostMapping("/{contentId}/clone")
+    public ResponseEntity<ContentCreateResponse> cloneContent(
+            @PathVariable Long contentId,
+            @RequestParam(defaultValue = "false") boolean regenerate
+    ) {
+        ContentCreateResponse response = contentService.cloneContent(contentId, regenerate);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
      * 카드뉴스 생성 결과를 조회합니다.
      *
      * 생성 파이프라인이 비동기로 실행되므로

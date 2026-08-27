@@ -134,6 +134,59 @@ public class ContentService {
         );
     }
 
+    /**
+     * 기존 콘텐츠의 입력값을 그대로 복제합니다.
+     *
+     * 제목/본문/템플릿/원본 이미지와 이미지 크롭 정보만 복사하고
+     * 기존 생성 결과 및 생성 이미지는 복사하지 않습니다.
+     * regenerate=true인 경우 새 콘텐츠에 대해 전체 생성 파이프라인을 즉시 실행합니다.
+     */
+    @Transactional
+    public ContentCreateResponse cloneContent(
+            Long contentId,
+            boolean regenerate
+    ) {
+        Content source = contentRepository.findByIdWithImages(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        Content cloned = Content.create(
+                source.getTitle(),
+                source.getBody(),
+                source.getTemplate()
+        );
+
+        for (ContentImage sourceImage : source.getImages()) {
+            cloned.addImage(
+                    ContentImage.copyOf(sourceImage, cloned.getImages().size())
+            );
+        }
+
+        contentRepository.save(cloned);
+
+        if (!regenerate) {
+            log.info("콘텐츠 복제 완료 - sourceContentId={}, clonedContentId={}, regenerate=false",
+                    contentId, cloned.getId());
+            return ContentCreateResponse.of(cloned);
+        }
+
+        JobHistory jobHistory = jobHistoryService.createJobHistory(
+                cloned,
+                JobType.FULL_PIPELINE
+        );
+
+        eventPublisher.publishEvent(
+                new ContentGenerationRequestedEvent(
+                        cloned.getId(),
+                        jobHistory.getId()
+                )
+        );
+
+        log.info("콘텐츠 복제 후 즉시 재생성 요청 - sourceContentId={}, clonedContentId={}, jobHistoryId={}",
+                contentId, cloned.getId(), jobHistory.getId());
+
+        return ContentCreateResponse.of(cloned, jobHistory);
+    }
+
     @Transactional
     public ContentCreateResponse editContent(
             Long contentId,
