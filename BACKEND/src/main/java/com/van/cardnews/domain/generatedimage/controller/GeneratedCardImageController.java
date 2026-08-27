@@ -7,6 +7,8 @@ import com.van.cardnews.domain.generatedimage.service.CardImageGenerationService
 import com.van.cardnews.domain.generatedimage.service.GeneratedImageZipService;
 import com.van.cardnews.domain.approval.entity.ApprovalStatus;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.domain.download.entity.DownloadType;
+import com.van.cardnews.domain.download.service.DownloadHistoryService;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class GeneratedCardImageController {
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final GeneratedImageZipService generatedImageZipService;
     private final ApprovalRequestRepository approvalRequestRepository;
+    private final DownloadHistoryService downloadHistoryService;
 
     /** 카드뉴스 이미지 생성 트리거 (Higgsfield 호출 → 저장) */
     @PostMapping("/generate")
@@ -46,42 +49,109 @@ public class GeneratedCardImageController {
         return ResponseEntity.ok(GeneratedCardImageResponse.from(images));
     }
 
-    /** 개별 다운로드 (CN-007) */
+    /** 개별 다운로드 */
     @GetMapping("/{imageId}/download")
     public ResponseEntity<Resource> download(
             @PathVariable Long contentId,
-            @PathVariable Long imageId
+            @PathVariable Long imageId,
+            @RequestParam(defaultValue = "WEB") String channel
     ) {
-        GeneratedCardImage image = generatedCardImageRepository.findById(imageId)
-                .orElseThrow(() -> new IllegalArgumentException("이미지를 찾을 수 없습니다: " + imageId));
+        Long historyId = downloadHistoryService.start(
+                contentId,
+                normalizeChannel(channel),
+                DownloadType.SINGLE,
+                imageId
+        );
 
-        validateApproved(contentId);
+        try {
+            GeneratedCardImage image = generatedCardImageRepository
+                    .findByIdAndContent_Id(imageId, contentId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "이미지를 찾을 수 없습니다: " + imageId
+                    ));
 
-        // [확인 필요] storageRef가 로컬 절대경로라는 전제 (LocalImageStorageService 기준)
-        Resource resource = new FileSystemResource(image.getStorageRef());
+            validateApproved(contentId);
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_PNG)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + image.getCardType().name().toLowerCase()
-                                + "-" + image.getCardIndex() + ".png\"")
-                .body(resource);
+            if (image.getStorageRef() == null || image.getStorageRef().isBlank()) {
+                throw new IllegalStateException("다운로드할 이미지 저장 경로가 없습니다.");
+            }
+
+            Resource resource = new FileSystemResource(image.getStorageRef());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new IllegalStateException("다운로드할 이미지 파일을 찾을 수 없습니다.");
+            }
+
+            downloadHistoryService.markSuccess(historyId);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_PNG)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + image.getCardType().name().toLowerCase()
+                                    + "-" + image.getCardIndex() + ".png\"")
+                    .body(resource);
+        } catch (Exception e) {
+            downloadHistoryService.markFailed(
+                    historyId,
+                    e.getMessage() != null ? e.getMessage() : "개별 다운로드에 실패했습니다."
+            );
+            throw e;
+        }
     }
 
     /** 일괄 다운로드 — ZIP (CN-007) */
     @GetMapping("/download-all")
-    public ResponseEntity<byte[]> downloadAll(@PathVariable Long contentId) {
-        validateApproved(contentId);
+    public ResponseEntity<byte[]> downloadAll(
+            @PathVariable Long contentId,
+            @RequestParam(defaultValue = "WEB") String channel
+    ) {
+        Long historyId = downloadHistoryService.start(
+                contentId,
+                normalizeChannel(channel),
+                DownloadType.ZIP,
+                null
+        );
 
-        List<GeneratedCardImage> images =
-                generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
-        byte[] zip = generatedImageZipService.zip(images);
+        try {
+            validateApproved(contentId);
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"content-" + contentId + "-cards.zip\"")
-                .body(zip);
+            List<GeneratedCardImage> images =
+                    generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
+
+            if (images.isEmpty()) {
+                throw new IllegalStateException("다운로드할 카드 이미지가 없습니다.");
+            }
+
+            byte[] zip = generatedImageZipService.zip(images);
+
+            downloadHistoryService.markSuccess(historyId);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"content-" + contentId + "-cards.zip\"")
+                    .body(zip);
+        } catch (Exception e) {
+            downloadHistoryService.markFailed(
+                    historyId,
+                    e.getMessage() != null ? e.getMessage() : "일괄 다운로드에 실패했습니다."
+            );
+            throw e;
+        }
+    }
+
+    private String normalizeChannel(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return "WEB";
+        }
+
+        String normalized = channel.trim().toUpperCase();
+
+        if (normalized.length() > 50) {
+            throw new CustomException(ErrorCode.INVALID_DOWNLOAD_CHANNEL);
+        }
+
+        return normalized;
     }
 
     private void validateApproved(Long contentId) {
