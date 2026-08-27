@@ -2,6 +2,8 @@ package com.van.cardnews.domain.download.service;
 
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.download.dto.response.DownloadHistoryResponse;
 import com.van.cardnews.domain.download.entity.DownloadHistory;
 import com.van.cardnews.domain.download.entity.DownloadResult;
@@ -22,6 +24,7 @@ public class DownloadHistoryService {
 
     private final DownloadHistoryRepository downloadHistoryRepository;
     private final ContentRepository contentRepository;
+    private final AuditLogService auditLogService;
 
     /**
      * 다운로드 시도 이력을 생성합니다.
@@ -34,7 +37,8 @@ public class DownloadHistoryService {
             Long contentId,
             String channel,
             DownloadType downloadType,
-            Long imageId
+            Long imageId,
+            String actorId
     ) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
@@ -58,7 +62,15 @@ public class DownloadHistoryService {
                 imageId
         );
 
-        return downloadHistoryRepository.save(history).getId();
+        Long historyId = downloadHistoryRepository.save(history).getId();
+        auditLogService.record(
+                actorId,
+                AuditAction.DOWNLOAD,
+                contentId,
+                "콘텐츠 다운로드 요청: " + downloadType.name()
+        );
+
+        return historyId;
     }
 
     /**
@@ -72,6 +84,13 @@ public class DownloadHistoryService {
                 );
 
         history.markSuccess();
+
+        // 현재 프로젝트에서는 외부 게시 대신 최종 결과물 다운로드를
+        // 발행 완료 시점으로 간주합니다.
+        Content content = history.getContent();
+        if (content.getStatus() != com.van.cardnews.domain.content.entity.ContentStatus.PUBLISHED) {
+            content.publish();
+        }
     }
 
     /**

@@ -43,9 +43,12 @@ public class GeneratedCardImageController {
 
     /** 미리보기용 — 이미 생성된 결과 목록 조회 (CN-008) */
     @GetMapping
-    public ResponseEntity<List<GeneratedCardImageResponse>> list(@PathVariable Long contentId) {
+    public ResponseEntity<List<GeneratedCardImageResponse>> list(
+            @PathVariable Long contentId
+    ) {
         List<GeneratedCardImage> images =
                 generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
+
         return ResponseEntity.ok(GeneratedCardImageResponse.from(images));
     }
 
@@ -54,13 +57,18 @@ public class GeneratedCardImageController {
     public ResponseEntity<Resource> download(
             @PathVariable Long contentId,
             @PathVariable Long imageId,
-            @RequestParam(defaultValue = "WEB") String channel
+            @RequestParam(defaultValue = "WEB") String channel,
+            @RequestHeader(value = "X-Actor-Id", defaultValue = "SYSTEM") String actorId
     ) {
+        // 승인된 콘텐츠만 다운로드할 수 있습니다.
+        validateApproved(contentId);
+
         Long historyId = downloadHistoryService.start(
                 contentId,
                 normalizeChannel(channel),
                 DownloadType.SINGLE,
-                imageId
+                imageId,
+                actorId
         );
 
         try {
@@ -69,8 +77,6 @@ public class GeneratedCardImageController {
                     .orElseThrow(() -> new IllegalArgumentException(
                             "이미지를 찾을 수 없습니다: " + imageId
                     ));
-
-            validateApproved(contentId);
 
             if (image.getStorageRef() == null || image.getStorageRef().isBlank()) {
                 throw new IllegalStateException("다운로드할 이미지 저장 경로가 없습니다.");
@@ -86,14 +92,22 @@ public class GeneratedCardImageController {
 
             return ResponseEntity.ok()
                     .contentType(MediaType.IMAGE_PNG)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + image.getCardType().name().toLowerCase()
-                                    + "-" + image.getCardIndex() + ".png\"")
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" +
+                                    image.getCardType().name().toLowerCase() +
+                                    "-" +
+                                    image.getCardIndex() +
+                                    ".png\""
+                    )
                     .body(resource);
+
         } catch (Exception e) {
             downloadHistoryService.markFailed(
                     historyId,
-                    e.getMessage() != null ? e.getMessage() : "개별 다운로드에 실패했습니다."
+                    e.getMessage() != null
+                            ? e.getMessage()
+                            : "개별 다운로드에 실패했습니다."
             );
             throw e;
         }
@@ -103,18 +117,21 @@ public class GeneratedCardImageController {
     @GetMapping("/download-all")
     public ResponseEntity<byte[]> downloadAll(
             @PathVariable Long contentId,
-            @RequestParam(defaultValue = "WEB") String channel
+            @RequestParam(defaultValue = "WEB") String channel,
+            @RequestHeader(value = "X-Actor-Id", defaultValue = "SYSTEM") String actorId
     ) {
+        // 승인된 콘텐츠만 다운로드할 수 있습니다.
+        validateApproved(contentId);
+
         Long historyId = downloadHistoryService.start(
                 contentId,
                 normalizeChannel(channel),
                 DownloadType.ZIP,
-                null
+                null,
+                actorId
         );
 
         try {
-            validateApproved(contentId);
-
             List<GeneratedCardImage> images =
                     generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
 
@@ -128,13 +145,20 @@ public class GeneratedCardImageController {
 
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"content-" + contentId + "-cards.zip\"")
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"content-" +
+                                    contentId +
+                                    "-cards.zip\""
+                    )
                     .body(zip);
+
         } catch (Exception e) {
             downloadHistoryService.markFailed(
                     historyId,
-                    e.getMessage() != null ? e.getMessage() : "일괄 다운로드에 실패했습니다."
+                    e.getMessage() != null
+                            ? e.getMessage()
+                            : "일괄 다운로드에 실패했습니다."
             );
             throw e;
         }
