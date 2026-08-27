@@ -94,6 +94,16 @@ public enum ErrorCode {
             "반려 사유는 필수입니다."
     ),
 
+    DOWNLOAD_HISTORY_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "요청한 다운로드 이력을 찾을 수 없습니다."
+    ),
+
+    INVALID_DOWNLOAD_CHANNEL(
+            HttpStatus.BAD_REQUEST,
+            "다운로드 채널 값이 올바르지 않습니다."
+    ),
+
     CONTENT_NOT_APPROVED(
             HttpStatus.FORBIDDEN,
             "승인 완료된 작업물만 다운로드할 수 있습니다."
