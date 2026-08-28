@@ -8,6 +8,10 @@ import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.entity.ContentStatus;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
+import com.van.cardnews.domain.jobhistory.entity.JobHistory;
+import com.van.cardnews.domain.jobhistory.entity.JobStatus;
+import com.van.cardnews.domain.jobhistory.entity.JobType;
+import com.van.cardnews.domain.jobhistory.repository.JobHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +27,7 @@ public class ContentManagementService {
     private final ContentRepository contentRepository;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final GeneratedCardImageRepository generatedCardImageRepository;
+    private final JobHistoryRepository jobHistoryRepository;
 
     @Transactional(readOnly = true)
     public List<ContentManagementListResponse> getContents() {
@@ -54,6 +59,37 @@ public class ContentManagementService {
         );
     }
 
+    private String resolveGenerationStatus(Content content) {
+        Long contentId = content.getId();
+
+        var latestJob = jobHistoryRepository
+                .findTopByContentIdOrderByRequestedAtDesc(contentId);
+
+        if (latestJob.isEmpty()) {
+            return null;
+        }
+
+        JobHistory latest = latestJob.get();
+        var latestImageJob = jobHistoryRepository
+                .findTopByContentIdAndJobTypeOrderByRequestedAtDesc(contentId, JobType.IMAGE_GENERATION);
+
+        // 가장 최근 작업이 이미지 생성이라면 이미지 작업 상태를 우선합니다.
+        if (latestImageJob.isPresent()
+                && !latestImageJob.get().getRequestedAt().isBefore(latest.getRequestedAt())) {
+            return latestImageJob.get().getStatus().name();
+        }
+
+        // 카드 구성은 완료됐지만 아직 이미지 생성 작업이 시작되지 않은 상태입니다.
+        if (latest.getJobType() == JobType.FULL_PIPELINE
+                && latest.getStatus() == JobStatus.COMPLETED
+                && content.getCardGenerationResult() != null
+                && generatedCardImageRepository.countByContent_Id(contentId) == 0) {
+            return "IMAGE_PENDING";
+        }
+
+        return latest.getStatus().name();
+    }
+
     private ContentManagementListResponse toListResponse(Content content) {
         ApprovalRequest approvalRequest =
                 approvalRequestRepository
@@ -62,10 +98,13 @@ public class ContentManagementService {
 
         int cardCount = (int) generatedCardImageRepository.countByContent_Id(content.getId());
 
+        String generationStatus = resolveGenerationStatus(content);
+
         return ContentManagementListResponse.from(
                 content,
                 cardCount,
-                approvalRequest
+                approvalRequest,
+                generationStatus
         );
     }
 

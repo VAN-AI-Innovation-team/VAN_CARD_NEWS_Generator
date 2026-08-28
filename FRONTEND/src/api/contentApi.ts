@@ -136,6 +136,8 @@ export interface ContentPreviewResponse {
   cardGenerationResult: CardGenerationResult | null;
   cardImagePlacements: CardImagePlacement[] | null;
   images: PreviewImage[];
+  generationStatus:
+    'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'IMAGE_PENDING' | null;
 }
 
 export async function createContent(
@@ -163,6 +165,21 @@ export async function createContent(
   const response = await axios.post<CreateContentResponse>(
     '/api/contents',
     formData,
+  );
+
+  return response.data;
+}
+
+export async function cloneContent(
+  contentId: number,
+  regenerate = true,
+): Promise<CreateContentResponse> {
+  const response = await axios.post<CreateContentResponse>(
+    `/api/contents/${contentId}/clone`,
+    null,
+    {
+      params: { regenerate },
+    },
   );
 
   return response.data;
@@ -457,13 +474,30 @@ export interface ContentManagementListItem {
   contentStatus: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   approvalRequestId: number | null;
+  generationStatus:
+    'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'IMAGE_PENDING' | null;
 }
 
-export async function fetchContentManagementList(): Promise<
-  ContentManagementListItem[]
-> {
-  const response =
-    await axios.get<ContentManagementListItem[]>('/api/contents');
+export interface ContentHistoryPageResponse {
+  contents: ContentManagementListItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export async function fetchContentManagementList(
+  page = 0,
+  size = 20,
+): Promise<ContentHistoryPageResponse> {
+  const response = await axios.get<ContentHistoryPageResponse>(
+    '/api/contents/history',
+    {
+      params: { page, size },
+    },
+  );
 
   return response.data;
 }

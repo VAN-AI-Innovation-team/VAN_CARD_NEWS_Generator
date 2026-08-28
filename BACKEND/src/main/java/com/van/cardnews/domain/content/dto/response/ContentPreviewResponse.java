@@ -16,16 +16,25 @@ public record ContentPreviewResponse(
         TemplatePreview template,
         JsonNode cardGenerationResult,
         JsonNode cardImagePlacements,
-        List<ImagePreview> images
+        List<ImagePreview> images,
+        String generationStatus
 ) {
 
     public static ContentPreviewResponse from(Content content) {
-        return from(content, null);
+        return from(content, null, null);
     }
 
     public static ContentPreviewResponse from(
             Content content,
             ApprovalRequest approvalRequest
+    ) {
+        return from(content, approvalRequest, null);
+    }
+
+    public static ContentPreviewResponse from(
+            Content content,
+            ApprovalRequest approvalRequest,
+            String generationStatus
     ) {
         return new ContentPreviewResponse(
                 content.getId(),
@@ -41,7 +50,8 @@ public record ContentPreviewResponse(
                 content.getImages()
                         .stream()
                         .map(ImagePreview::from)
-                        .toList()
+                        .toList(),
+                generationStatus
         );
     }
 

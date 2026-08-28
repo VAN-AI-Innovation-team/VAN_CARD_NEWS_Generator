@@ -12,12 +12,14 @@ public record ContentManagementListResponse(
         int cardCount,
         String contentStatus,
         String approvalStatus,
-        Long approvalRequestId
+        Long approvalRequestId,
+        String generationStatus
 ) {
     public static ContentManagementListResponse from(
             Content content,
             int cardCount,
-            ApprovalRequest approvalRequest
+            ApprovalRequest approvalRequest,
+            String generationStatus
     ) {
         return new ContentManagementListResponse(
                 content.getId(),
@@ -26,7 +28,8 @@ public record ContentManagementListResponse(
                 cardCount,
                 content.getStatus().name(),
                 approvalRequest != null ? approvalRequest.getStatus().name() : null,
-                approvalRequest != null ? approvalRequest.getId() : null
+                approvalRequest != null ? approvalRequest.getId() : null,
+                generationStatus
         );
     }
 }

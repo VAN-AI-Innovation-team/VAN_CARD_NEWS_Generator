@@ -17,7 +17,15 @@ function formatDate(value: string) {
   });
 }
 
-function approvalLabel(status: ContentManagementListItem['approvalStatus']) {
+function approvalLabel(
+  status: ContentManagementListItem['approvalStatus'],
+  generationStatus: ContentManagementListItem['generationStatus'],
+) {
+  if (generationStatus === 'PENDING' || generationStatus === 'PROCESSING') {
+    return '생성 중';
+  }
+  if (generationStatus === 'FAILED') return '생성 실패';
+  if (generationStatus === 'IMAGE_PENDING') return '이미지 생성 대기';
   if (status === 'PENDING') return '승인 대기';
   if (status === 'APPROVED') return '승인 완료';
   if (status === 'REJECTED') return '반려됨';
@@ -28,14 +36,22 @@ export default function ContentManagement({
   onSelect,
 }: ContentManagementProps) {
   const [contents, setContents] = useState<ContentManagementListItem[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const PAGE_SIZE = 20;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(targetPage = page) {
     try {
       setIsLoading(true);
       setError(null);
-      setContents(await fetchContentManagementList());
+      const result = await fetchContentManagementList(targetPage, PAGE_SIZE);
+      setContents(result.contents);
+      setPage(result.page);
+      setTotalPages(result.totalPages);
+      setTotalElements(result.totalElements);
     } catch (loadError) {
       console.error('콘텐츠 관리 목록 조회 실패:', loadError);
       setError(
@@ -49,8 +65,8 @@ export default function ContentManagement({
   }
 
   useEffect(() => {
-    void load();
-  }, []);
+    void load(page);
+  }, [page]);
 
   return (
     <section className="content-management">
@@ -65,7 +81,7 @@ export default function ContentManagement({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => void load()}
+          onClick={() => void load(page)}
           disabled={isLoading}
         >
           {isLoading ? '조회 중...' : '새로고침'}
@@ -115,19 +131,76 @@ export default function ContentManagement({
               </span>
               <span>{formatDate(content.createdAt)}</span>
               <span>
-                {content.cardCount > 0 ? `${content.cardCount}장` : '생성 중'}
+                {content.generationStatus === 'PENDING' ||
+                content.generationStatus === 'PROCESSING'
+                  ? '생성 중'
+                  : content.generationStatus === 'IMAGE_PENDING'
+                    ? '이미지 생성 대기'
+                    : content.generationStatus === 'FAILED'
+                      ? '생성 실패'
+                      : `${content.cardCount}장`}
               </span>
               <span>
                 <em
                   className={`content-management__status content-management__status--${(content.approvalStatus ?? 'none').toLowerCase()}`}
                 >
-                  {approvalLabel(content.approvalStatus)}
+                  {approvalLabel(
+                    content.approvalStatus,
+                    content.generationStatus,
+                  )}
                 </em>
               </span>
               <span className="content-management__arrow">→</span>
             </button>
           ))}
         </div>
+      )}
+
+      {!isLoading && !error && totalPages > 1 && (
+        <nav
+          className="content-management__pagination"
+          aria-label="콘텐츠 페이지 이동"
+        >
+          <button
+            type="button"
+            className="content-management__page-button content-management__page-button--arrow"
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            disabled={page === 0}
+            aria-label="이전 페이지"
+          >
+            ←
+          </button>
+
+          {Array.from({ length: totalPages }, (_, index) => index).map(
+            (pageNumber) => (
+              <button
+                type="button"
+                key={pageNumber}
+                className={`content-management__page-button ${pageNumber === page ? 'content-management__page-button--active' : ''}`}
+                onClick={() => setPage(pageNumber)}
+                aria-current={pageNumber === page ? 'page' : undefined}
+              >
+                {pageNumber + 1}
+              </button>
+            ),
+          )}
+
+          <button
+            type="button"
+            className="content-management__page-button content-management__page-button--arrow"
+            onClick={() =>
+              setPage((current) => Math.min(totalPages - 1, current + 1))
+            }
+            disabled={page >= totalPages - 1}
+            aria-label="다음 페이지"
+          >
+            →
+          </button>
+
+          <span className="content-management__pagination-count">
+            전체 {totalElements}개
+          </span>
+        </nav>
       )}
     </section>
   );

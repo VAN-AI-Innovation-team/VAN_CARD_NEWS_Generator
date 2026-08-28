@@ -22,7 +22,9 @@ import com.van.cardnews.domain.generation.service.CardGenerationValidator;
 import com.van.cardnews.domain.generation.service.CardGenerationService;
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
 import com.van.cardnews.domain.jobhistory.entity.JobType;
+import com.van.cardnews.domain.jobhistory.entity.JobStatus;
 import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
+import com.van.cardnews.domain.jobhistory.repository.JobHistoryRepository;
 import com.van.cardnews.domain.template.entity.Template;
 import com.van.cardnews.domain.template.repository.TemplateRepository;
 import com.van.cardnews.global.exception.CustomException;
@@ -47,6 +49,7 @@ public class ContentService {
 
     private final ContentRepository contentRepository;
     private final JobHistoryService jobHistoryService;
+    private final JobHistoryRepository jobHistoryRepository;
     private final ImageStorageService imageStorageService;
     private final TemplateRepository templateRepository;
     private final ObjectMapper objectMapper;
@@ -128,10 +131,50 @@ public class ContentService {
                                 )
                         );
 
+        String generationStatus = resolveGenerationStatus(contentId, content);
+
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                generationStatus
         );
+    }
+
+    /**
+     * 전체 콘텐츠 생성 상태를 판별합니다.
+     *
+     * FULL_PIPELINE은 카드 구성(카피) 생성만 담당하고
+     * 실제 카드 이미지는 IMAGE_GENERATION에서 별도로 생성합니다.
+     * 따라서 FULL_PIPELINE이 완료되었더라도 이미지가 아직 없다면
+     * IMAGE_PENDING 상태로 내려 프론트엔드가 생성 미완료 콘텐츠로 처리할 수 있도록 합니다.
+     */
+    private String resolveGenerationStatus(Long contentId, Content content) {
+        var latestJob = jobHistoryRepository
+                .findTopByContentIdOrderByRequestedAtDesc(contentId);
+
+        if (latestJob.isEmpty()) {
+            return null;
+        }
+
+        JobHistory latest = latestJob.get();
+        var latestImageJob = jobHistoryRepository
+                .findTopByContentIdAndJobTypeOrderByRequestedAtDesc(contentId, JobType.IMAGE_GENERATION);
+
+        // 가장 최근 작업이 이미지 생성이라면 이미지 작업 상태를 우선합니다.
+        if (latestImageJob.isPresent()
+                && !latestImageJob.get().getRequestedAt().isBefore(latest.getRequestedAt())) {
+            return latestImageJob.get().getStatus().name();
+        }
+
+        // 카드 구성은 완료됐지만 아직 이미지 생성 작업이 시작되지 않은 상태입니다.
+        if (latest.getJobType() == JobType.FULL_PIPELINE
+                && latest.getStatus() == JobStatus.COMPLETED
+                && content.getCardGenerationResult() != null
+                && generatedCardImageRepository.countByContent_Id(contentId) == 0) {
+            return "IMAGE_PENDING";
+        }
+
+        return latest.getStatus().name();
     }
 
     /**
@@ -197,6 +240,16 @@ public class ContentService {
 
         Content content = contentRepository.findByIdWithImages(contentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        if (jobHistoryRepository.existsByContentIdAndStatusIn(
+                contentId,
+                List.of(JobStatus.PENDING, JobStatus.PROCESSING)
+        )) {
+            throw new CustomException(
+                    ErrorCode.CONTENT_GENERATION_IN_PROGRESS,
+                    "현재 콘텐츠의 생성 작업이 진행 중입니다. 생성 완료 후 다시 수정해주세요."
+            );
+        }
 
         Template template = templateRepository.findByIdAndActiveTrue(request.templateId())
                 .orElseThrow(() -> new CustomException(ErrorCode.TEMPLATE_NOT_FOUND));
@@ -278,7 +331,8 @@ public class ContentService {
 
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                resolveGenerationStatus(contentId, content)
         );
     }
 
@@ -325,7 +379,8 @@ public class ContentService {
 
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                resolveGenerationStatus(contentId, content)
         );
     }
 
@@ -388,7 +443,8 @@ public class ContentService {
 
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                resolveGenerationStatus(contentId, content)
         );
     }
 
@@ -436,7 +492,8 @@ public class ContentService {
 
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                resolveGenerationStatus(contentId, content)
         );
     }
 
@@ -518,7 +575,8 @@ public class ContentService {
 
         return ContentPreviewResponse.from(
                 content,
-                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null)
+                approvalRequestRepository.findTopByContentIdOrderByRequestedAtDesc(contentId).orElse(null),
+                resolveGenerationStatus(contentId, content)
         );
     }
 

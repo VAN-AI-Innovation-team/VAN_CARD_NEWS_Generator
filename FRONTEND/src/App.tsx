@@ -25,6 +25,7 @@ import type { ContentType } from './types/content';
 import {
   createContent,
   editContent,
+  cloneContent,
   fetchContentPreview,
   generateCardImages,
   fetchGeneratedCardImages,
@@ -125,10 +126,6 @@ function AppContent() {
     try {
       const restoredPreview = await fetchContentPreview(contentId);
 
-      if (!restoredPreview.cardGenerationResult) {
-        return;
-      }
-
       setPreview(restoredPreview);
       setSelectedContentType(
         restoredPreview.template.contentType as ContentType,
@@ -147,6 +144,17 @@ function AppContent() {
           imageUrl: image.imageUrl,
         })),
       );
+
+      if (!restoredPreview.cardGenerationResult) {
+        setGeneratedImages([]);
+        setGenerationImageError(null);
+        setPreviewError(null);
+        setStep(2);
+        setScreen('create');
+        localStorage.setItem(ACTIVE_CONTENT_ID_KEY, String(contentId));
+        window.history.replaceState(null, '', `/?contentId=${contentId}`);
+        return;
+      }
 
       const restoredImages = await fetchGeneratedCardImages(contentId);
       setGeneratedImages(restoredImages);
@@ -325,6 +333,55 @@ function AppContent() {
     setScreen('create');
     clearSelectedTemplate();
     setSelectedTemplateId(previewData.template.id);
+  }
+
+  async function handleCloneAndRegenerate(contentId: number) {
+    try {
+      setPreviewError(null);
+      setGenerationImageError(null);
+      setIsCreating(true);
+
+      const response = await cloneContent(contentId, true);
+      const previewData = await waitForPreview(response.contentId);
+      const clonedImages = await fetchGeneratedCardImages(response.contentId);
+
+      setSelectedContentType(previewData.template.contentType as ContentType);
+      setSelectedTemplateId(previewData.template.id);
+      setEditingContentId(response.contentId);
+      setPostData({
+        title: previewData.title,
+        body: previewData.body,
+        images: [],
+        existingImageIds: previewData.images.map((image) => image.id),
+      });
+      setEditingExistingImages(
+        previewData.images.map((image) => ({
+          id: image.id,
+          imageUrl: image.imageUrl,
+        })),
+      );
+      setPreview(previewData);
+      setGeneratedImages(clonedImages);
+      setScreen('create');
+      setStep(2);
+
+      localStorage.setItem(ACTIVE_CONTENT_ID_KEY, String(response.contentId));
+      window.history.replaceState(
+        null,
+        '',
+        `/?contentId=${response.contentId}`,
+      );
+    } catch (error) {
+      console.error('콘텐츠 복제 및 재생성 실패:', error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : '콘텐츠 복제 및 재생성에 실패했습니다.';
+      setPreviewError(message);
+      throw new Error(message);
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   function handleStartNewContent() {
@@ -792,6 +849,7 @@ function AppContent() {
             onBack={() => setScreen('content-management')}
             onUpdated={() => undefined}
             onEdit={handleEditManagedContent}
+            onCloneAndRegenerate={handleCloneAndRegenerate}
           />
         ) : screen === 'approval-list' ? (
           <ApprovalList
