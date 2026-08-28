@@ -69,6 +69,11 @@ public enum ErrorCode {
             "지원하지 않는 콘텐츠 유형입니다."
     ),
 
+    CONTENT_GENERATION_IN_PROGRESS(
+            HttpStatus.CONFLICT,
+            "현재 콘텐츠의 생성 작업이 진행 중입니다."
+    ),
+
     CONTENT_NOT_READY_FOR_APPROVAL(
             HttpStatus.BAD_REQUEST,
             "카드뉴스 생성이 완료되지 않아 승인 요청할 수 없습니다."
