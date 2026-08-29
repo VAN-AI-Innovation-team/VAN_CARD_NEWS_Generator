@@ -31,14 +31,12 @@ services:
       dockerfile: Dockerfile
     container_name: van-card-news-backend
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/van_card_news_db
-      SPRING_DATASOURCE_USERNAME: van_web
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+
       SPRING_CONFIG_IMPORT: "optional:configtree:/run/secrets/"
-      SPRING_DATASOURCE_PASSWORD: "$${db_password}"
       LOG_LEVEL_ROOT: INFO
       SERVER_ERROR_INCLUDE_MESSAGE: always
       SERVER_ERROR_INCLUDE_STACKTRACE: on_param
@@ -48,9 +46,6 @@ services:
       APP_GENERATED_DIR: /app/generated
       APP_GENERATED_PUBLIC_BASE_URL: http://localhost:8080/generated
 
-    secrets:
-      - source: db_password
-        target: db_password
     volumes:
       - uploads_data:/app/uploads
       - generated_data:/app/generated
