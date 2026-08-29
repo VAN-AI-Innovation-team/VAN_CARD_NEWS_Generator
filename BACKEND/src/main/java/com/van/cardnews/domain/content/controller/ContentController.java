@@ -59,7 +59,7 @@ public class ContentController {
     }
 
     /**
-     * Claude가 생성한 카드 구성 결과를 사용자가 수정한 내용으로 갱신합니다.
+     * OpenAI가 생성한 카드 구성 결과를 사용자가 수정한 내용으로 갱신합니다.
      *
      * 실제 카드 이미지 생성(Higgsfield)은 이 API에서 실행하지 않습니다.
      * 수정된 CardGenerationResult를 저장하고,

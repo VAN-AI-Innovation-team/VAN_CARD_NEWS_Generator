@@ -24,8 +24,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
-    // Claude Java SDK
-    implementation 'com.anthropic:anthropic-java:2.52.0'
+    // OpenAI Java SDK
+    implementation 'com.openai:openai-java:4.54.0'
 
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
