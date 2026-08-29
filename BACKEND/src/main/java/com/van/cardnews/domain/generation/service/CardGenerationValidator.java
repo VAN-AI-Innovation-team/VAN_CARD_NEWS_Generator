@@ -10,7 +10,7 @@ public class CardGenerationValidator {
     private static final int DEFAULT_MAX_CHARS = 50;
 
     /**
-     * Claude가 반환한 최초 결과를 검증합니다.
+     * OpenAI가 반환한 최초 결과를 검증합니다.
      */
     public void validateInitial(
             CardGenerationResult result,

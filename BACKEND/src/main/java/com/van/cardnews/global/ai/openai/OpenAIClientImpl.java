@@ -1,14 +1,14 @@
-package com.van.cardnews.global.ai.claude;
+package com.van.cardnews.global.ai.openai;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.models.messages.Base64ImageSource;
-import com.anthropic.models.messages.ContentBlockParam;
-import com.anthropic.models.messages.ImageBlockParam;
-import com.anthropic.models.messages.StructuredMessage;
-import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.TextBlockParam;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
+import com.openai.models.ChatModel;
+import com.openai.models.chat.completions.ChatCompletionContentPart;
+import com.openai.models.chat.completions.ChatCompletionContentPartImage;
+import com.openai.models.chat.completions.ChatCompletionContentPartText;
+import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import lombok.extern.slf4j.Slf4j;
@@ -22,19 +22,19 @@ import java.util.List;
 @Slf4j
 @Component
 @Profile("prod")
-public class ClaudeClientImpl implements ClaudeClient {
+public class OpenAIClientImpl implements com.van.cardnews.global.ai.openai.OpenAIClient {
 
-    private final AnthropicClient client;
+    private final OpenAIClient client;
     private final String model;
     private final long maxTokens;
     private final ObjectMapper objectMapper;
 
-    public ClaudeClientImpl(
-            @Value("${app.ai.claude.model}") String model,
-            @Value("${app.ai.claude.max-tokens}") long maxTokens,
+    public OpenAIClientImpl(
+            @Value("${app.ai.openai.model}") String model,
+            @Value("${app.ai.openai.max-tokens}") long maxTokens,
             ObjectMapper objectMapper
     ) {
-        this.client = AnthropicOkHttpClient.fromEnv();
+        this.client = OpenAIOkHttpClient.fromEnv();
         this.model = model;
         this.maxTokens = maxTokens;
         this.objectMapper = objectMapper;
@@ -44,37 +44,39 @@ public class ClaudeClientImpl implements ClaudeClient {
     public CardGenerationResult generateCardContent(
             CardGenerationRequest request
     ) {
-        List<ContentBlockParam> blocks =
-                buildContentBlocks(request);
+        List<ChatCompletionContentPart> parts =
+                buildContentParts(request);
 
-        StructuredMessageCreateParams<CardGenerationResult> params =
-                StructuredMessageCreateParams
-                        .<CardGenerationResult>builder()
-                        .model(model)
-                        .maxTokens(maxTokens)
-                        .addUserMessageOfBlockParams(blocks)
-                        .outputConfig(CardGenerationResult.class)
+        StructuredChatCompletionCreateParams<CardGenerationResult> params =
+                ChatCompletionCreateParams
+                        .builder()
+                        .model(ChatModel.of(model))
+                        .maxCompletionTokens(maxTokens)
+                        .addUserMessageOfArrayOfContentParts(parts)
+                        .responseFormat(CardGenerationResult.class)
                         .build();
 
-        StructuredMessage<CardGenerationResult> response =
-                client.messages().create(params);
-
         CardGenerationResult result =
-                response.content()
+                client.chat()
+                        .completions()
+                        .create(params)
+                        .choices()
                         .stream()
-                        .flatMap(contentBlock ->
-                                contentBlock.text().stream()
+                        .flatMap(choice ->
+                                choice.message()
+                                        .content()
+                                        .stream()
                         )
                         .findFirst()
                         .orElseThrow(() ->
                                 new IllegalStateException(
-                                        "Claude가 카드 구성 결과를 반환하지 않았습니다."
+                                        "OpenAI가 카드 구성 결과를 반환하지 않았습니다."
                                 )
-                        )
-                        .text();
+                        );
 
         log.info(
-                "Claude 카드 구성 완료 - contentType={}",
+                "OpenAI 카드 구성 완료 - model={}, contentType={}",
+                model,
                 request.contentType()
         );
 
@@ -89,8 +91,8 @@ public class ClaudeClientImpl implements ClaudeClient {
             int cardIndex,
             String instruction
     ) {
-        List<ContentBlockParam> blocks =
-                buildContentBlocksForRegeneration(
+        List<ChatCompletionContentPart> parts =
+                buildContentPartsForRegeneration(
                         request,
                         currentResult,
                         cardType,
@@ -98,34 +100,36 @@ public class ClaudeClientImpl implements ClaudeClient {
                         instruction
                 );
 
-        StructuredMessageCreateParams<CardGenerationResult> params =
-                StructuredMessageCreateParams
-                        .<CardGenerationResult>builder()
-                        .model(model)
-                        .maxTokens(maxTokens)
-                        .addUserMessageOfBlockParams(blocks)
-                        .outputConfig(CardGenerationResult.class)
+        StructuredChatCompletionCreateParams<CardGenerationResult> params =
+                ChatCompletionCreateParams
+                        .builder()
+                        .model(ChatModel.of(model))
+                        .maxCompletionTokens(maxTokens)
+                        .addUserMessageOfArrayOfContentParts(parts)
+                        .responseFormat(CardGenerationResult.class)
                         .build();
 
-        StructuredMessage<CardGenerationResult> response =
-                client.messages().create(params);
-
         CardGenerationResult result =
-                response.content()
+                client.chat()
+                        .completions()
+                        .create(params)
+                        .choices()
                         .stream()
-                        .flatMap(contentBlock ->
-                                contentBlock.text().stream()
+                        .flatMap(choice ->
+                                choice.message()
+                                        .content()
+                                        .stream()
                         )
                         .findFirst()
                         .orElseThrow(() ->
                                 new IllegalStateException(
-                                        "Claude가 카드 재작성 결과를 반환하지 않았습니다."
+                                        "OpenAI가 카드 재작성 결과를 반환하지 않았습니다."
                                 )
-                        )
-                        .text();
+                        );
 
         log.info(
-                "Claude 카드 재작성 완료 - contentType={}, cardType={}, cardIndex={}",
+                "OpenAI 카드 재작성 완료 - model={}, contentType={}, cardType={}, cardIndex={}",
+                model,
                 request.contentType(),
                 cardType,
                 cardIndex
@@ -134,91 +138,40 @@ public class ClaudeClientImpl implements ClaudeClient {
         return result;
     }
 
-    /**
-     * Claude 요청에 포함할 이미지 블록을 생성합니다.
-     *
-     * 일반 카드 생성과 특정 카드 재생성에서 동일한 이미지 입력을 사용하므로
-     * 공통 메서드로 관리합니다.
-     */
-    private List<ContentBlockParam> buildImageBlocks(
+    private List<ChatCompletionContentPart> buildContentParts(
             CardGenerationRequest request
     ) {
-        List<ContentBlockParam> blocks =
+        List<ChatCompletionContentPart> parts =
                 new ArrayList<>();
 
-        for (CardGenerationRequest.InputImage image
-                : request.images()) {
+        addImageParts(parts, request);
 
-            blocks.add(
-                    ContentBlockParam.ofText(
-                            TextBlockParam.builder()
-                                    .text(
-                                            "IMAGE_ID=" +
-                                                    image.imageId()
-                                    )
-                                    .build()
-                    )
-            );
-
-            blocks.add(
-                    ContentBlockParam.ofImage(
-                            ImageBlockParam.builder()
-                                    .source(
-                                            Base64ImageSource.builder()
-                                                    .mediaType(
-                                                            toMediaType(
-                                                                    image.mediaType()
-                                                            )
-                                                    )
-                                                    .data(
-                                                            image.base64Data()
-                                                    )
-                                                    .build()
-                                    )
-                                    .build()
-                    )
-            );
-        }
-
-        return blocks;
-    }
-
-    private List<ContentBlockParam> buildContentBlocks(
-            CardGenerationRequest request
-    ) {
-        List<ContentBlockParam> blocks =
-                new ArrayList<>(
-                        buildImageBlocks(request)
-                );
-
-        blocks.add(
-                ContentBlockParam.ofText(
-                        TextBlockParam.builder()
-                                .text(
-                                        buildPrompt(request)
-                                )
+        parts.add(
+                ChatCompletionContentPart.ofText(
+                        ChatCompletionContentPartText.builder()
+                                .text(buildPrompt(request))
                                 .build()
                 )
         );
 
-        return blocks;
+        return parts;
     }
 
-    private List<ContentBlockParam> buildContentBlocksForRegeneration(
+    private List<ChatCompletionContentPart> buildContentPartsForRegeneration(
             CardGenerationRequest request,
             CardGenerationResult currentResult,
             String cardType,
             int cardIndex,
             String instruction
     ) {
-        List<ContentBlockParam> blocks =
-                new ArrayList<>(
-                        buildImageBlocks(request)
-                );
+        List<ChatCompletionContentPart> parts =
+                new ArrayList<>();
 
-        blocks.add(
-                ContentBlockParam.ofText(
-                        TextBlockParam.builder()
+        addImageParts(parts, request);
+
+        parts.add(
+                ChatCompletionContentPart.ofText(
+                        ChatCompletionContentPartText.builder()
                                 .text(
                                         buildRegenerationPrompt(
                                                 request,
@@ -232,28 +185,51 @@ public class ClaudeClientImpl implements ClaudeClient {
                 )
         );
 
-        return blocks;
+        return parts;
     }
 
-    private Base64ImageSource.MediaType toMediaType(
-            String mediaType
+    private void addImageParts(
+            List<ChatCompletionContentPart> parts,
+            CardGenerationRequest request
     ) {
-        return switch (mediaType) {
-            case "image/jpeg" ->
-                    Base64ImageSource.MediaType.IMAGE_JPEG;
+        if (request.images() == null) {
+            return;
+        }
 
-            case "image/png" ->
-                    Base64ImageSource.MediaType.IMAGE_PNG;
+        for (CardGenerationRequest.InputImage image : request.images()) {
 
-            case "image/webp" ->
-                    Base64ImageSource.MediaType.IMAGE_WEBP;
+            parts.add(
+                    ChatCompletionContentPart.ofText(
+                            ChatCompletionContentPartText.builder()
+                                    .text(
+                                            "IMAGE_ID=" +
+                                                    image.imageId()
+                                    )
+                                    .build()
+                    )
+            );
 
-            default ->
-                    throw new IllegalArgumentException(
-                            "지원하지 않는 이미지 형식입니다: " +
-                                    mediaType
-                    );
-        };
+            String dataUrl =
+                    "data:" +
+                            image.mediaType() +
+                            ";base64," +
+                            image.base64Data();
+
+            parts.add(
+                    ChatCompletionContentPart.ofImageUrl(
+                            ChatCompletionContentPartImage.builder()
+                                    .imageUrl(
+                                            ChatCompletionContentPartImage.ImageUrl.builder()
+                                                    .url(dataUrl)
+                                                    .detail(
+                                                            ChatCompletionContentPartImage.ImageUrl.Detail.HIGH
+                                                    )
+                                                    .build()
+                                    )
+                                    .build()
+                    )
+            );
+        }
     }
 
     private String buildPrompt(

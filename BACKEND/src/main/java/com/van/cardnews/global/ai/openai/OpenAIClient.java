@@ -1,10 +1,13 @@
-package com.van.cardnews.global.ai.claude;
+package com.van.cardnews.global.ai.openai;
 
 import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 
-public interface ClaudeClient {
-    CardGenerationResult generateCardContent(CardGenerationRequest request);
+public interface OpenAIClient {
+
+    CardGenerationResult generateCardContent(
+            CardGenerationRequest request
+    );
 
     CardGenerationResult regenerateCardContent(
             CardGenerationRequest request,

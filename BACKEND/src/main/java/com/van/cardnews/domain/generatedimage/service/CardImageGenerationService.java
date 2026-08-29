@@ -37,7 +37,7 @@ public class CardImageGenerationService {
 
         if (content.getCardGenerationResult() == null) {
             throw new IllegalStateException(
-                    "Claude 생성 결과가 없는 콘텐츠입니다. 먼저 카드 구성이 완료되어야 합니다: " + contentId
+                    "OpenAI 생성 결과가 없는 콘텐츠입니다. 먼저 카드 구성이 완료되어야 합니다: " + contentId
             );
         }
 
