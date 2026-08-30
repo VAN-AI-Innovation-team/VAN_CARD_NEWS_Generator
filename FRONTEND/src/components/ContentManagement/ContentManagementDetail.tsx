@@ -170,11 +170,7 @@ export default function ContentManagementDetail({
   }
 
   const currentImage = images[selectedIndex];
-  const status =
-    approval?.status ??
-    preview?.approvalStatus ??
-    content.approvalStatus ??
-    null;
+  const status = approval?.status ?? null;
 
   return (
     <section className="content-management-detail">
@@ -292,50 +288,23 @@ export default function ContentManagementDetail({
               {isCloning ? '복제 및 재생성 중...' : '복제 · 재생성'}
             </button>
 
-            {generationInProgress ? (
+            {content.contentStatus === 'DRAFT' && generationInProgress ? (
               <>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={handleEdit}
-                  disabled={!preview || isProcessing || isCloning}
+                  disabled={
+                    !preview ||
+                    generationInProgress ||
+                    isProcessing ||
+                    isCloning
+                  }
                 >
                   콘텐츠 이어서 작업
                 </button>
                 <button type="button" className="primary-button" disabled>
                   생성 진행 중
-                </button>
-              </>
-            ) : status === 'APPROVED' ? (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => void download()}
-                disabled={isDownloading}
-              >
-                {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
-              </button>
-            ) : status === 'PENDING' ? (
-              <button type="button" className="primary-button" disabled>
-                승인 요청 대기 중
-              </button>
-            ) : status === 'REJECTED' ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => preview && onEdit(preview)}
-                  disabled={!preview || isProcessing}
-                >
-                  콘텐츠 수정
-                </button>
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => void requestApproval()}
-                  disabled={isProcessing || !images.length}
-                >
-                  {isProcessing ? '승인 요청 중...' : '재승인 요청'}
                 </button>
               </>
             ) : content.contentStatus === 'DRAFT' ? (
@@ -357,9 +326,46 @@ export default function ContentManagementDetail({
                   {isProcessing ? '승인 요청 중...' : '승인 요청'}
                 </button>
               </>
+            ) : status === 'PENDING' ? (
+              <button type="button" className="primary-button" disabled>
+                승인 요청 대기 중
+              </button>
+            ) : status === 'APPROVED' ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void download()}
+                disabled={isDownloading}
+              >
+                {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
+              </button>
+            ) : status === 'REJECTED' ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => preview && onEdit(preview)}
+                  disabled={!preview || isProcessing}
+                >
+                  콘텐츠 수정
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => void requestApproval()}
+                  disabled={isProcessing || !images.length}
+                >
+                  {isProcessing ? '승인 요청 중...' : '재승인 요청'}
+                </button>
+              </>
             ) : (
-              <button type="button" className="secondary-button" disabled>
-                승인 요청 불가
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void requestApproval()}
+                disabled={isProcessing || !images.length}
+              >
+                {isProcessing ? '승인 요청 중...' : '승인 요청'}
               </button>
             )}
           </footer>

@@ -7,7 +7,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080', // 백엔드 실행 주소 및 포트
+        target:
+          'https://van-card-news-backend-571061095487.asia-northeast3.run.app', // 백엔드 실행 주소 및 포트
         changeOrigin: true,
       },
     },
