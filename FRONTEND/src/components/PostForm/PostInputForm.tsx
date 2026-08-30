@@ -47,41 +47,44 @@ function PostInputForm({
 }: PostInputFormProps) {
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
+
   const [images, setImages] = useState<ImageItem[]>([]);
+
   const [existingImages, setExistingImages] = useState<ExistingImageInput[]>(
-    initialExistingImages,
+    [],
   );
+
   const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 필드별 "사용자가 한 번이라도 상호작용했는지" 여부.
-  // 값이 true가 되기 전까지는 필수 입력 에러를 보여주지 않아,
-  // 폼 진입 직후부터 에러가 한꺼번에 노출되는 것을 방지합니다.
+  // 필드별 "사용자가 한 번이라도 상호작용했는지" 여부
   const [titleTouched, setTitleTouched] = useState(false);
   const [bodyTouched, setBodyTouched] = useState(false);
   const [imagesTouched, setImagesTouched] = useState(false);
 
-  // 사용자가 글자수 제한을 "초과해서 입력을 시도한 바로 그 순간"에만 true가 됩니다.
-  // (제한까지 정상적으로 채운 것과, 제한을 넘겨서 입력하려 한 것을 구분하기 위함)
+  // 사용자가 글자수 제한을 초과해서 입력하려 한 경우
   const [titleLimitExceeded, setTitleLimitExceeded] = useState(false);
   const [bodyLimitExceeded, setBodyLimitExceeded] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   /**
-   * 이전 단계에서 돌아왔을 때
-   * App에서 저장하고 있던 입력값을 복원합니다.
+   * 초기 데이터 복원
+   *
+   * 중요:
+   * initialData는 부모의 onChange에 의해 계속 새로운 객체가 전달될 수 있습니다.
+   * 따라서 [initialData, initialExistingImages]를 dependency로 두면
+   * 사용자가 이미지를 삭제할 때마다 기존 이미지가 다시 복원될 수 있습니다.
+   *
+   * 현재 App 구조에서는 Step 2로 진입할 때 PostInputForm이 새로 마운트되므로
+   * 최초 마운트 시점에만 초기값을 가져오면 됩니다.
    */
   useEffect(() => {
-    if (!initialData) {
-      return;
-    }
-
-    setTitle(initialData.title);
-    setBody(initialData.body);
+    setTitle(initialData?.title ?? '');
+    setBody(initialData?.body ?? '');
     setExistingImages(initialExistingImages);
 
-    const restoredImages: ImageItem[] = initialData.images.map(
+    const restoredImages: ImageItem[] = (initialData?.images ?? []).map(
       (file, index) => ({
         id: `${file.name}-${file.lastModified}-${index}`,
         file,
@@ -89,18 +92,21 @@ function PostInputForm({
       }),
     );
 
-    setImages((previousImages) => {
-      previousImages.forEach((image) => {
+    setImages(restoredImages);
+
+    return () => {
+      restoredImages.forEach((image) => {
         URL.revokeObjectURL(image.previewUrl);
       });
+    };
 
-      return restoredImages;
-    });
-  }, [initialData, initialExistingImages]);
+    // 의도적으로 최초 마운트 시점의 초기값만 사용합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
-   * 컴포넌트가 사라지거나 이미지 목록이 변경될 때
-   * object URL을 정리합니다.
+   * 컴포넌트가 완전히 사라질 때
+   * 새로 선택한 이미지의 object URL을 정리합니다.
    */
   useEffect(() => {
     return () => {
@@ -108,7 +114,7 @@ function PostInputForm({
         URL.revokeObjectURL(image.previewUrl);
       });
     };
-  }, [images]);
+  }, []);
 
   /**
    * 현재 입력값을 App으로 전달합니다.
@@ -117,16 +123,17 @@ function PostInputForm({
     nextTitle: string,
     nextBody: string,
     nextImages: ImageItem[],
+    nextExistingImages: ExistingImageInput[] = existingImages,
   ) {
     onChange?.({
       title: nextTitle,
       body: nextBody,
       images: nextImages.map((image) => image.file),
-      existingImageIds: existingImages.map((image) => image.id),
+      existingImageIds: nextExistingImages.map((image) => image.id),
     });
   }
 
-  // 필수 입력 검증 메시지 (trim 기준 — App.tsx의 isPostDataValid와 동일한 기준)
+  // 필수 입력 검증 메시지
   const titleRequiredError =
     title.trim().length === 0 ? '제목을 입력해주세요.' : null;
 
@@ -149,14 +156,11 @@ function PostInputForm({
     const rawValue = event.target.value;
     const nextTitle = rawValue.slice(0, TITLE_MAX_LENGTH);
 
-    // 실제로 제한을 넘겨 입력(타이핑/붙여넣기)하려 한 경우에만 에러를 켭니다.
-    // 지우거나 제한 이하로 입력 중이면 자동으로 꺼집니다.
     setTitleLimitExceeded(rawValue.length > TITLE_MAX_LENGTH);
-
     setTitle(nextTitle);
     setTitleTouched(true);
 
-    notifyChange(nextTitle, body, images);
+    notifyChange(nextTitle, body, images, existingImages);
   }
 
   function handleBodyChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -164,11 +168,10 @@ function PostInputForm({
     const nextBody = rawValue.slice(0, BODY_MAX_LENGTH);
 
     setBodyLimitExceeded(rawValue.length > BODY_MAX_LENGTH);
-
     setBody(nextBody);
     setBodyTouched(true);
 
-    notifyChange(title, nextBody, images);
+    notifyChange(title, nextBody, images, existingImages);
   }
 
   function handleTitleBlur() {
@@ -181,11 +184,11 @@ function PostInputForm({
 
   function addFiles(fileList: FileList) {
     setImagesTouched(true);
+    setErrorMessage('');
 
     const incomingFiles = Array.from(fileList);
 
     const validFiles: File[] = [];
-
     let rejectionReason = '';
 
     for (const file of incomingFiles) {
@@ -202,34 +205,40 @@ function PostInputForm({
       validFiles.push(file);
     }
 
-    setImages((previousImages) => {
-      const remainingSlots =
-        maxImages - existingImages.length - previousImages.length;
+    const remainingSlots = maxImages - existingImages.length - images.length;
 
-      if (remainingSlots <= 0) {
-        setErrorMessage(`사진은 최대 ${maxImages}장까지 업로드할 수 있어요.`);
+    if (remainingSlots <= 0) {
+      setErrorMessage(`사진은 최대 ${maxImages}장까지 업로드할 수 있어요.`);
+      return;
+    }
 
-        return previousImages;
+    const filesToAdd = validFiles.slice(0, remainingSlots);
+
+    if (filesToAdd.length === 0) {
+      if (rejectionReason) {
+        setErrorMessage(rejectionReason);
       }
 
-      const filesToAdd = validFiles.slice(0, remainingSlots);
+      return;
+    }
 
-      const newItems: ImageItem[] = filesToAdd.map((file) => ({
-        id: `${file.name}-${file.lastModified}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }));
+    const newItems: ImageItem[] = filesToAdd.map((file) => ({
+      id: `${file.name}-${file.lastModified}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
 
-      const nextImages = [...previousImages, ...newItems];
+    const nextImages = [...images, ...newItems];
 
-      notifyChange(title, body, nextImages);
+    setImages(nextImages);
 
-      return nextImages;
-    });
+    notifyChange(title, body, nextImages, existingImages);
 
-    setErrorMessage(rejectionReason);
+    if (rejectionReason) {
+      setErrorMessage(rejectionReason);
+    }
   }
 
   function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -265,39 +274,71 @@ function PostInputForm({
     fileInputRef.current?.click();
   }
 
+  /**
+   * 기존 서버 이미지 삭제
+   *
+   * 여기서 기존 이미지 배열을 먼저 갱신하고
+   * 갱신된 배열을 notifyChange에 명시적으로 전달합니다.
+   *
+   * 따라서 부모 postData에도 삭제된 이미지 ID가 즉시 반영됩니다.
+   */
   function handleRemoveExistingImage(id: number) {
     setImagesTouched(true);
+    setErrorMessage('');
 
-    setExistingImages((previousImages) => {
-      const nextImages = previousImages.filter((image) => image.id !== id);
+    const nextExistingImages = existingImages.filter(
+      (image) => image.id !== id,
+    );
 
-      onChange?.({
-        title,
-        body,
-        images: images.map((image) => image.file),
-        existingImageIds: nextImages.map((image) => image.id),
-      });
+    setExistingImages(nextExistingImages);
 
-      return nextImages;
-    });
+    notifyChange(title, body, images, nextExistingImages);
   }
 
+  /**
+   * 새로 선택한 이미지 삭제
+   */
   function handleRemoveImage(id: string) {
     setImagesTouched(true);
+    setErrorMessage('');
 
-    setImages((previousImages) => {
-      const target = previousImages.find((image) => image.id === id);
+    const target = images.find((image) => image.id === id);
 
-      if (target) {
-        URL.revokeObjectURL(target.previewUrl);
-      }
+    const nextImages = images.filter((image) => image.id !== id);
 
-      const nextImages = previousImages.filter((image) => image.id !== id);
+    if (target) {
+      URL.revokeObjectURL(target.previewUrl);
+    }
 
-      notifyChange(title, body, nextImages);
+    setImages(nextImages);
 
-      return nextImages;
-    });
+    notifyChange(title, body, nextImages, existingImages);
+  }
+
+  /**
+   * 서버 이미지 URL이 깨진 경우
+   *
+   * 백엔드가 아직 실행되지 않았거나 이미지 URL에 접근할 수 없는 경우에도
+   * 깨진 이미지 아이콘 대신 안내 문구를 보여줍니다.
+   */
+  function handleExistingImageError(
+    event: React.SyntheticEvent<HTMLImageElement>,
+  ) {
+    const image = event.currentTarget;
+
+    image.style.display = 'none';
+
+    const parent = image.parentElement;
+
+    if (!parent) {
+      return;
+    }
+
+    const errorElement = parent.querySelector('[data-image-error]');
+
+    if (errorElement instanceof HTMLElement) {
+      errorElement.style.display = 'flex';
+    }
   }
 
   return (
@@ -434,6 +475,7 @@ function PostInputForm({
           aria-describedby="post-images-error"
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
               handleDropzoneOpen();
             }
           }}
@@ -466,23 +508,48 @@ function PostInputForm({
 
         {totalImageCount > 0 && (
           <ul className={styles.thumbnailGrid}>
+            {/* 기존 서버 이미지 */}
             {existingImages.map((image) => (
               <li key={`existing-${image.id}`} className={styles.thumbnailItem}>
+                <div
+                  data-image-error
+                  style={{
+                    display: 'none',
+                    width: '100%',
+                    height: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    fontSize: '13px',
+                    color: '#999',
+                    padding: '12px',
+                  }}
+                >
+                  이미지를 불러올 수 없습니다.
+                </div>
+
                 <img
                   src={image.imageUrl}
                   alt="기존 업로드 이미지"
                   className={styles.thumbnailImage}
+                  onError={handleExistingImageError}
                 />
+
                 <button
                   type="button"
                   className={styles.thumbnailRemoveButton}
-                  onClick={() => handleRemoveExistingImage(image.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemoveExistingImage(image.id);
+                  }}
                   aria-label="기존 이미지 삭제"
                 >
                   ×
                 </button>
               </li>
             ))}
+
+            {/* 새로 선택한 이미지 */}
             {images.map((image) => (
               <li key={image.id} className={styles.thumbnailItem}>
                 <img
@@ -494,7 +561,10 @@ function PostInputForm({
                 <button
                   type="button"
                   className={styles.thumbnailRemoveButton}
-                  onClick={() => handleRemoveImage(image.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemoveImage(image.id);
+                  }}
                   aria-label={`${image.file.name} 삭제`}
                 >
                   ×

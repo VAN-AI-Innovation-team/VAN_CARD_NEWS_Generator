@@ -4,8 +4,6 @@ import com.van.cardnews.domain.approval.dto.request.ApprovalRejectRequest;
 import com.van.cardnews.domain.approval.dto.response.ApprovalRequestListResponse;
 import com.van.cardnews.domain.approval.dto.response.ApprovalRequestResponse;
 import com.van.cardnews.domain.approval.entity.ApprovalRequest;
-import com.van.cardnews.domain.audit.entity.AuditAction;
-import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.approval.entity.ApprovalStatus;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
 import com.van.cardnews.domain.content.entity.Content;
@@ -24,7 +22,6 @@ public class ApprovalRequestService {
 
     private final ContentRepository contentRepository;
     private final ApprovalRequestRepository approvalRequestRepository;
-    private final AuditLogService auditLogService;
 
     /**
      * 콘텐츠 승인 요청을 생성합니다.
@@ -79,15 +76,9 @@ public class ApprovalRequestService {
         ApprovalRequest approvalRequest =
                 ApprovalRequest.create(content, null);
 
-        ApprovalRequest savedRequest = approvalRequestRepository.save(approvalRequest);
-        auditLogService.record(
-                savedRequest.getRequesterId(),
-                AuditAction.APPROVAL_REQUEST,
-                contentId,
-                "콘텐츠 승인 요청"
+        return ApprovalRequestResponse.from(
+                approvalRequestRepository.save(approvalRequest)
         );
-
-        return ApprovalRequestResponse.from(savedRequest);
     }
 
     /**
@@ -151,12 +142,6 @@ public class ApprovalRequestService {
         validatePending(request);
 
         request.approve(null);
-        auditLogService.record(
-                request.getApproverId(),
-                AuditAction.APPROVE,
-                request.getContent().getId(),
-                "콘텐츠 승인"
-        );
 
         return ApprovalRequestResponse.from(request);
     }
@@ -187,12 +172,6 @@ public class ApprovalRequestService {
         request.reject(
                 null,
                 rejectRequest.reason().trim()
-        );
-        auditLogService.record(
-                request.getApproverId(),
-                AuditAction.REJECT,
-                request.getContent().getId(),
-                "콘텐츠 반려: " + rejectRequest.reason().trim()
         );
 
         return ApprovalRequestResponse.from(request);

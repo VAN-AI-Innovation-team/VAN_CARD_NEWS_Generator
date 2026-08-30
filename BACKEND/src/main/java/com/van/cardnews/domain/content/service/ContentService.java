@@ -10,8 +10,6 @@ import com.van.cardnews.domain.content.dto.request.ContentPreviewUpdateRequest;
 import com.van.cardnews.domain.content.dto.request.ContentTemplateUpdateRequest;
 import com.van.cardnews.domain.content.dto.request.CardRegenerationRequest;
 import com.van.cardnews.domain.content.dto.request.HighlightUpdateRequest;
-import com.van.cardnews.domain.audit.entity.AuditAction;
-import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.dto.response.ContentCreateResponse;
 import com.van.cardnews.domain.content.dto.response.ContentPreviewResponse;
 import com.van.cardnews.domain.content.entity.Content;
@@ -59,7 +57,6 @@ public class ContentService {
     private final ApprovalRequestRepository approvalRequestRepository;
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final CardGenerationService cardGenerationService;
-    private final AuditLogService auditLogService;
 
     @Transactional
     public ContentCreateResponse createContent(
@@ -89,12 +86,6 @@ public class ContentService {
         attachImages(content, images);
 
         contentRepository.save(content);
-        auditLogService.record(
-                null,
-                AuditAction.CREATE,
-                content.getId(),
-                "콘텐츠 생성"
-        );
 
         JobHistory jobHistory =
                 jobHistoryService.createJobHistory(
@@ -214,12 +205,6 @@ public class ContentService {
         }
 
         contentRepository.save(cloned);
-        auditLogService.record(
-                null,
-                AuditAction.CREATE,
-                cloned.getId(),
-                "콘텐츠 복제: sourceContentId=" + contentId
-        );
 
         if (!regenerate) {
             log.info("콘텐츠 복제 완료 - sourceContentId={}, clonedContentId={}, regenerate=false",
@@ -286,12 +271,6 @@ public class ContentService {
             throw new CustomException(ErrorCode.INVALID_INPUT, "사진을 최소 1장 이상 유지하거나 추가해주세요.");
         }
         content.updateBasicInfo(request.title().trim(), request.body().trim(), template);
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "콘텐츠 수정"
-        );
 
         generatedCardImageRepository.deleteByContent_Id(contentId);
 
@@ -347,12 +326,6 @@ public class ContentService {
         }
 
         content.updateTemplate(template);
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "콘텐츠 템플릿 수정: templateId=" + template.getId()
-        );
         content.updateCardImagePlacements(objectMapper.createArrayNode());
         generatedCardImageRepository.deleteByContent_Id(contentId);
 
@@ -401,12 +374,6 @@ public class ContentService {
         );
 
         content.updateCardGenerationResult(objectMapper.valueToTree(regenerated));
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "카드 재생성: cardType=" + cardType + ", cardIndex=" + request.cardIndex()
-        );
         content.updateCardImagePlacements(objectMapper.createArrayNode());
         generatedCardImageRepository.deleteByContent_Id(contentId);
 
@@ -472,12 +439,6 @@ public class ContentService {
         }
 
         content.updateCardGenerationResult(updated);
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "하이라이트 수정: cardType=" + cardType + ", cardIndex=" + request.cardIndex()
-        );
         generatedCardImageRepository.deleteByContent_Id(contentId);
 
         return ContentPreviewResponse.from(
@@ -525,12 +486,6 @@ public class ContentService {
 
         content.updateCardGenerationResult(
                 request.cardGenerationResult()
-        );
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "카드 구성 결과 수정"
         );
         generatedCardImageRepository.deleteByContent_Id(contentId);
         content.updateCardImagePlacements(objectMapper.createArrayNode());
@@ -616,12 +571,6 @@ public class ContentService {
 
         content.updateCardImagePlacements(placements);
         content.updateCardGenerationResult(updatedResult);
-        auditLogService.record(
-                null,
-                AuditAction.UPDATE,
-                contentId,
-                "카드 이미지 크롭 수정"
-        );
         generatedCardImageRepository.deleteByContent_Id(contentId);
 
         return ContentPreviewResponse.from(
