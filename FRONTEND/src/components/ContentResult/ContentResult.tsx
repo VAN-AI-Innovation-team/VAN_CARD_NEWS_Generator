@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   requestContentApproval,
@@ -25,6 +25,10 @@ export default function ContentResult({
   const [isRequestingApproval, setIsRequestingApproval] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setApprovalStatus(preview.approvalStatus);
+  }, [preview.approvalStatus]);
+
   async function handleRequestApproval() {
     if (
       isRequestingApproval ||
@@ -38,10 +42,13 @@ export default function ContentResult({
     try {
       setIsRequestingApproval(true);
       setApprovalError(null);
+
       const response = await requestContentApproval(preview.contentId);
+
       setApprovalStatus(response.status);
     } catch (requestError) {
       console.error('승인 요청 실패:', requestError);
+
       setApprovalError(
         requestError instanceof Error
           ? requestError.message
@@ -57,7 +64,9 @@ export default function ContentResult({
       <div className="content-result__summary">
         <div>
           <span className="content-result__eyebrow">GENERATION COMPLETE</span>
+
           <h4 className="content-result__title">{preview.title}</h4>
+
           <p className="content-result__description">
             Higgsfield에서 생성된 최종 카드 이미지를 순서대로 확인할 수
             있습니다.
@@ -73,7 +82,9 @@ export default function ContentResult({
       {isLoading ? (
         <div className="content-result__state">
           <div className="content-result__spinner" aria-hidden="true" />
+
           <strong>카드뉴스를 생성하고 있습니다.</strong>
+
           <p>
             Higgsfield에서 최종 카드 이미지를 생성하는 중입니다. 잠시만
             기다려주세요.
@@ -85,11 +96,13 @@ export default function ContentResult({
           role="alert"
         >
           <strong>카드뉴스 생성에 실패했습니다.</strong>
+
           <p>{error}</p>
         </div>
       ) : images.length === 0 ? (
         <div className="content-result__state">
           <strong>생성된 결과가 없습니다.</strong>
+
           <p>카드뉴스 생성 결과를 확인할 수 없습니다.</p>
         </div>
       ) : (
@@ -99,8 +112,10 @@ export default function ContentResult({
               <article key={image.id} className="content-result__card">
                 <div className="content-result__card-header">
                   <span>CARD {String(index + 1).padStart(2, '0')}</span>
+
                   <small>{image.cardType}</small>
                 </div>
+
                 <img
                   src={image.imageUrl}
                   alt={`${preview.title} 카드 ${index + 1}`}
@@ -113,6 +128,7 @@ export default function ContentResult({
           <div className="content-result__approval">
             <div>
               <span className="content-result__approval-label">승인 상태</span>
+
               <strong>
                 {approvalStatus === 'PENDING'
                   ? '승인 대기'
