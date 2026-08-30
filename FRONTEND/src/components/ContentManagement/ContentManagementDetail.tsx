@@ -31,13 +31,30 @@ function label(
   status: ApprovalState['status'] | null,
   generationStatus: ContentManagementListItem['generationStatus'],
 ) {
-  if (generationStatus === 'PENDING' || generationStatus === 'PROCESSING')
+  if (generationStatus === 'PENDING' || generationStatus === 'PROCESSING') {
     return '생성 중';
-  if (generationStatus === 'FAILED') return '생성 실패';
-  if (generationStatus === 'IMAGE_PENDING') return '이미지 생성 대기';
-  if (status === 'PENDING') return '승인 대기';
-  if (status === 'APPROVED') return '승인 완료';
-  if (status === 'REJECTED') return '반려됨';
+  }
+
+  if (generationStatus === 'FAILED') {
+    return '생성 실패';
+  }
+
+  if (generationStatus === 'IMAGE_PENDING') {
+    return '이미지 생성 대기';
+  }
+
+  if (status === 'PENDING') {
+    return '승인 대기';
+  }
+
+  if (status === 'APPROVED') {
+    return '승인 완료';
+  }
+
+  if (status === 'REJECTED') {
+    return '반려됨';
+  }
+
   return '승인 요청 전';
 }
 
@@ -57,22 +74,29 @@ export default function ContentManagementDetail({
   const [isCloning, setIsCloning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const generationInProgress =
     preview?.generationStatus === 'PENDING' ||
     preview?.generationStatus === 'PROCESSING';
 
   async function load(silent = false) {
     try {
-      if (!silent) setIsLoading(true);
+      if (!silent) {
+        setIsLoading(true);
+      }
+
       setError(null);
+
       const [previewData, imageData] = await Promise.all([
         fetchContentPreview(content.contentId),
         fetchGeneratedCardImages(content.contentId),
       ]);
+
       const approvalData =
         content.approvalRequestId === null
           ? null
           : await fetchApprovalRequest(content.approvalRequestId);
+
       setPreview(previewData);
       setImages(imageData);
       setApproval(approvalData);
@@ -84,7 +108,9 @@ export default function ContentManagementDetail({
           : '콘텐츠 상세 정보를 불러오지 못했습니다.',
       );
     } finally {
-      if (!silent) setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -93,7 +119,9 @@ export default function ContentManagementDetail({
   }, [content.contentId, content.approvalRequestId]);
 
   useEffect(() => {
-    if (!generationInProgress) return;
+    if (!generationInProgress) {
+      return;
+    }
 
     const timer = window.setInterval(() => {
       void load(true);
@@ -108,13 +136,22 @@ export default function ContentManagementDetail({
       !images.length ||
       approval?.status === 'PENDING' ||
       approval?.status === 'APPROVED'
-    )
+    ) {
       return;
+    }
+
     try {
       setIsProcessing(true);
       setError(null);
+
       const result = await requestContentApproval(content.contentId);
-      setApproval({ ...result, reason: null, processedAt: null });
+
+      setApproval({
+        ...result,
+        reason: null,
+        processedAt: null,
+      });
+
       onUpdated();
     } catch (e) {
       setError(e instanceof Error ? e.message : '승인 요청에 실패했습니다.');
@@ -124,16 +161,22 @@ export default function ContentManagementDetail({
   }
 
   function handleEdit() {
-    if (!preview || isProcessing || isCloning) return;
+    if (!preview || isProcessing || isCloning) {
+      return;
+    }
+
     onEdit(preview);
   }
 
   async function handleCloneAndRegenerate() {
-    if (isCloning || isProcessing) return;
+    if (isCloning || isProcessing) {
+      return;
+    }
 
     try {
       setIsCloning(true);
       setError(null);
+
       await onCloneAndRegenerate(content.contentId);
     } catch (cloneError) {
       setError(
@@ -147,18 +190,25 @@ export default function ContentManagementDetail({
   }
 
   async function download() {
-    if (isDownloading || approval?.status !== 'APPROVED') return;
+    if (isDownloading || approval?.status !== 'APPROVED') {
+      return;
+    }
+
     try {
       setIsDownloading(true);
       setError(null);
+
       const blob = await downloadApprovedCards(content.contentId);
       const url = URL.createObjectURL(blob);
+
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `content-${content.contentId}-cards.zip`;
+
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
+
       URL.revokeObjectURL(url);
     } catch (e) {
       setError(
@@ -182,12 +232,16 @@ export default function ContentManagementDetail({
         >
           ← 콘텐츠 관리
         </button>
+
         <span
-          className={`content-management-detail__status content-management-detail__status--${(status ?? 'none').toLowerCase()}`}
+          className={`content-management-detail__status content-management-detail__status--${(
+            status ?? 'none'
+          ).toLowerCase()}`}
         >
           {label(status, preview?.generationStatus ?? content.generationStatus)}
         </span>
       </div>
+
       {error && (
         <div className="content-management-detail__error" role="alert">
           {error}
@@ -199,9 +253,12 @@ export default function ContentManagementDetail({
           <p className="content-management-detail__eyebrow">
             CONTENT · DETAIL & REVIEW
           </p>
+
           <h2>{preview?.title ?? content.title}</h2>
+
           <p>콘텐츠 #{content.contentId}</p>
         </div>
+
         <div className="content-management-detail__meta">
           <span>카드 수</span>
           <strong>{isLoading ? '-' : `${images.length}장`}</strong>
@@ -224,14 +281,20 @@ export default function ContentManagementDetail({
                 <button
                   type="button"
                   key={image.id}
-                  className={`content-management-detail__thumb ${selectedIndex === index ? 'content-management-detail__thumb--selected' : ''}`}
+                  className={`content-management-detail__thumb ${
+                    selectedIndex === index
+                      ? 'content-management-detail__thumb--selected'
+                      : ''
+                  }`}
                   onClick={() => setSelectedIndex(index)}
                 >
                   <span>카드 {String(index + 1).padStart(2, '0')}</span>
+
                   <img src={image.imageUrl} alt="" />
                 </button>
               ))}
             </aside>
+
             <div className="content-management-detail__viewer">
               {currentImage ? (
                 <img
@@ -244,6 +307,7 @@ export default function ContentManagementDetail({
                   <span>최종 이미지 생성이 완료되지 않았습니다.</span>
                 </div>
               )}
+
               {currentImage && (
                 <div className="content-management-detail__caption">
                   CARD {String(selectedIndex + 1).padStart(2, '0')} ·{' '}
@@ -251,9 +315,11 @@ export default function ContentManagementDetail({
                 </div>
               )}
             </div>
+
             <aside className="content-management-detail__info">
               <div>
                 <span>승인 상태</span>
+
                 <strong>
                   {label(
                     status,
@@ -261,14 +327,17 @@ export default function ContentManagementDetail({
                   )}
                 </strong>
               </div>
+
               {preview?.template && (
                 <div>
                   <span>사용 템플릿</span>
+
                   <strong>
                     {preview.template.code} · {preview.template.name}
                   </strong>
                 </div>
               )}
+
               {approval?.status === 'REJECTED' && approval.reason && (
                 <div className="content-management-detail__reason">
                   <span>반려 사유</span>
@@ -288,6 +357,7 @@ export default function ContentManagementDetail({
               {isCloning ? '복제 및 재생성 중...' : '복제 · 재생성'}
             </button>
 
+            {/* 1. 생성 중 */}
             {content.contentStatus === 'DRAFT' && generationInProgress ? (
               <>
                 <button
@@ -303,34 +373,18 @@ export default function ContentManagementDetail({
                 >
                   콘텐츠 이어서 작업
                 </button>
+
                 <button type="button" className="primary-button" disabled>
                   생성 진행 중
                 </button>
               </>
-            ) : content.contentStatus === 'DRAFT' ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleEdit}
-                  disabled={!preview || isProcessing || isCloning}
-                >
-                  콘텐츠 수정
-                </button>
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => void requestApproval()}
-                  disabled={isProcessing || !images.length}
-                >
-                  {isProcessing ? '승인 요청 중...' : '승인 요청'}
-                </button>
-              </>
             ) : status === 'PENDING' ? (
+              /* 2. 승인 대기 */
               <button type="button" className="primary-button" disabled>
                 승인 요청 대기 중
               </button>
             ) : status === 'APPROVED' ? (
+              /* 3. 승인 완료 */
               <button
                 type="button"
                 className="primary-button"
@@ -340,6 +394,7 @@ export default function ContentManagementDetail({
                 {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
               </button>
             ) : status === 'REJECTED' ? (
+              /* 4. 반려 */
               <>
                 <button
                   type="button"
@@ -349,6 +404,7 @@ export default function ContentManagementDetail({
                 >
                   콘텐츠 수정
                 </button>
+
                 <button
                   type="button"
                   className="primary-button"
@@ -358,16 +414,28 @@ export default function ContentManagementDetail({
                   {isProcessing ? '승인 요청 중...' : '재승인 요청'}
                 </button>
               </>
-            ) : (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => void requestApproval()}
-                disabled={isProcessing || !images.length}
-              >
-                {isProcessing ? '승인 요청 중...' : '승인 요청'}
-              </button>
-            )}
+            ) : content.contentStatus === 'DRAFT' ? (
+              /* 5. 승인 요청 전 DRAFT */
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleEdit}
+                  disabled={!preview || isProcessing || isCloning}
+                >
+                  콘텐츠 수정
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => void requestApproval()}
+                  disabled={isProcessing || !images.length}
+                >
+                  {isProcessing ? '승인 요청 중...' : '승인 요청'}
+                </button>
+              </>
+            ) : null}
           </footer>
         </>
       )}
