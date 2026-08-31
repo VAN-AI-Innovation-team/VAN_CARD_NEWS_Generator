@@ -231,7 +231,7 @@ function AppContent() {
   /**
    * localStorage에 저장된 draft를 복원합니다.
    */
-  function restoreDraftState() {
+  async function restoreDraftState() {
     const raw = localStorage.getItem(DRAFT_STATE_KEY);
 
     if (!raw) {
@@ -240,6 +240,27 @@ function AppContent() {
 
     try {
       const draft = JSON.parse(raw) as StoredDraftState;
+
+      // 편집 중이던 콘텐츠를 가리키고 있다면,
+      // 사용 전에 서버에 실제로 존재하는지 먼저 확인합니다.
+      if (draft.editingContentId) {
+        try {
+          await fetchContentPreview(draft.editingContentId);
+        } catch (checkError) {
+          if (
+            axios.isAxiosError(checkError) &&
+            checkError.response?.status === 404
+          ) {
+            console.warn(
+              `editingContentId=${draft.editingContentId}가 서버에 존재하지 않아 draft를 초기화합니다.`,
+            );
+            localStorage.removeItem(DRAFT_STATE_KEY);
+            localStorage.removeItem(ACTIVE_CONTENT_ID_KEY);
+            return;
+          }
+          // 404가 아닌 오류(네트워크 등)는 일단 복원을 진행합니다.
+        }
+      }
 
       if (draft.selectedContentType) {
         setSelectedContentType(draft.selectedContentType);
@@ -366,15 +387,47 @@ function AppContent() {
   async function restoreAppState() {
     const { screen: urlScreen, step: urlStep, contentId } = readUrlState();
 
-    restoreDraftState();
+    /*
+     * URL에 contentId가 없는 생성 화면은
+     * 이전 콘텐츠/draft를 복원하지 않고 새 콘텐츠 생성 첫 화면에서 시작합니다.
+     */
+    if (!urlScreen || urlScreen === 'create') {
+      if (!contentId) {
+        localStorage.removeItem(ACTIVE_CONTENT_ID_KEY);
+        localStorage.removeItem(DRAFT_STATE_KEY);
+        localStorage.removeItem(APP_STEP_KEY);
+
+        setScreen('create');
+        setStep(1);
+        setSelectedContentType(null);
+        setPostData(null);
+        setEditingContentId(null);
+        setEditingExistingImages([]);
+        setPreview(null);
+        setPreviewError(null);
+        setGeneratedImages([]);
+        setGenerationImageError(null);
+        clearSelectedTemplate();
+
+        updateUrl('create', 1, null);
+        return;
+      }
+
+      setScreen('create');
+      await restoreActiveContent(contentId, urlStep);
+      return;
+    }
+
+    /*
+     * 생성 화면이 아닌 경우에만 draft 상태를 복원합니다.
+     */
+    await restoreDraftState();
 
     /*
      * URL에 화면 정보가 있으면 URL을 최우선으로 사용합니다.
      */
-    if (urlScreen) {
-      setScreen(urlScreen);
-      localStorage.setItem(APP_SCREEN_KEY, urlScreen);
-    }
+    setScreen(urlScreen);
+    localStorage.setItem(APP_SCREEN_KEY, urlScreen);
 
     /*
      * URL에 단계 정보가 있으면 URL을 최우선으로 사용합니다.
@@ -439,70 +492,6 @@ function AppContent() {
           console.error('선택된 승인 요청 상세 상태 복원 실패:', error);
           localStorage.removeItem(SELECTED_APPROVAL_REQUEST_KEY);
         }
-      }
-    }
-
-    /*
-     * URL에 화면 정보가 없는 기존 주소로 접근한 경우
-     * localStorage의 마지막 화면을 사용합니다.
-     */
-    if (!urlScreen) {
-      const storedScreen = localStorage.getItem(APP_SCREEN_KEY);
-
-      if (
-        storedScreen === 'approval-list' ||
-        storedScreen === 'approval-review' ||
-        storedScreen === 'content-management' ||
-        storedScreen === 'content-management-detail'
-      ) {
-        setScreen(storedScreen as AppScreen);
-      } else {
-        setScreen('create');
-      }
-    }
-
-    /*
-     * URL과 localStorage 모두 단계 정보가 없으면
-     * 기본적으로 1단계에서 시작합니다.
-     */
-    if (!urlStep && !urlScreen) {
-      const storedStep = Number(localStorage.getItem(APP_STEP_KEY));
-
-      if (Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= 5) {
-        setStep(storedStep as Step);
-      } else {
-        setStep(1);
-      }
-    }
-
-    /*
-     * 생성 화면에서 contentId가 존재하면
-     * 해당 콘텐츠를 다시 불러옵니다.
-     */
-    if ((urlScreen === null || urlScreen === 'create') && contentId) {
-      setScreen('create');
-
-      await restoreActiveContent(contentId, urlStep);
-
-      return;
-    }
-
-    /*
-     * URL에 contentId가 없더라도
-     * 마지막 작업 콘텐츠가 있으면 제작 화면에서 복원합니다.
-     */
-    if (!urlScreen || urlScreen === 'create') {
-      const storedContentId = Number(
-        localStorage.getItem(ACTIVE_CONTENT_ID_KEY),
-      );
-
-      if (
-        Number.isInteger(storedContentId) &&
-        storedContentId > 0 &&
-        urlStep &&
-        urlStep >= 4
-      ) {
-        await restoreActiveContent(storedContentId, urlStep);
       }
     }
   }
@@ -637,11 +626,25 @@ function AppContent() {
     } catch (error) {
       console.error('카드뉴스 생성/미리보기 실패:', error);
 
-      setPreviewError(
-        error instanceof Error
-          ? error.message
-          : '카드뉴스 생성 중 오류가 발생했습니다.',
-      );
+      if (
+        editingContentId &&
+        axios.isAxiosError(error) &&
+        error.response?.status === 404
+      ) {
+        localStorage.removeItem(DRAFT_STATE_KEY);
+        localStorage.removeItem(ACTIVE_CONTENT_ID_KEY);
+        setEditingContentId(null);
+
+        setPreviewError(
+          '수정하려던 콘텐츠를 서버에서 찾을 수 없습니다. 새 콘텐츠로 다시 작성해주세요.',
+        );
+      } else {
+        setPreviewError(
+          error instanceof Error
+            ? error.message
+            : '카드뉴스 생성 중 오류가 발생했습니다.',
+        );
+      }
     } finally {
       setIsCreating(false);
     }
