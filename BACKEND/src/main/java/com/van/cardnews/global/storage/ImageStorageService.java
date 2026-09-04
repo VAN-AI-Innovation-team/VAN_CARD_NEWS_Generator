@@ -10,9 +10,15 @@ public interface ImageStorageService {
     String store(MultipartFile file);
 
     /**
-     * 저장된 원본 이미지의 바이트를 읽습니다.
+     * 저장된 이미지의 바이트를 공개 URL로 읽습니다. (업로드 이미지 / 생성 이미지 모두)
      */
     byte[] read(String imageUrl);
+
+    /**
+     * 저장된 이미지의 바이트를 스토리지 참조(storageRef)로 읽습니다.
+     * 로컬 구현은 절대 경로, GCS 구현은 {@code gs://버킷/객체} 를 참조로 씁니다.
+     */
+    byte[] readRef(String storageRef);
 
     /**
      * 저장된 이미지의 MIME 타입을 반환합니다.

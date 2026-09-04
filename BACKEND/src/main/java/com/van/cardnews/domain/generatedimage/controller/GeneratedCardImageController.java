@@ -11,8 +11,9 @@ import com.van.cardnews.domain.download.entity.DownloadType;
 import com.van.cardnews.domain.download.service.DownloadHistoryService;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
+import com.van.cardnews.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,6 +32,7 @@ public class GeneratedCardImageController {
     private final GeneratedImageZipService generatedImageZipService;
     private final ApprovalRequestRepository approvalRequestRepository;
     private final DownloadHistoryService downloadHistoryService;
+    private final ImageStorageService imageStorageService;
 
     /** 카드뉴스 이미지 생성 트리거 (Higgsfield 호출 → 저장) */
     @PostMapping("/generate")
@@ -82,11 +84,9 @@ public class GeneratedCardImageController {
                 throw new IllegalStateException("다운로드할 이미지 저장 경로가 없습니다.");
             }
 
-            Resource resource = new FileSystemResource(image.getStorageRef());
-
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new IllegalStateException("다운로드할 이미지 파일을 찾을 수 없습니다.");
-            }
+            Resource resource = new ByteArrayResource(
+                    imageStorageService.readRef(image.getStorageRef())
+            );
 
             downloadHistoryService.markSuccess(historyId);
 
