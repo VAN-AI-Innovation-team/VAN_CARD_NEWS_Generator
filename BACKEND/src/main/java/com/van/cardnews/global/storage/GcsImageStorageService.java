@@ -9,6 +9,7 @@ import com.google.cloud.storage.StorageOptions;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class GcsImageStorageService implements ImageStorageService {
     private final String uploadPrefix;
     private final String generatedPrefix;
 
+    @Autowired
     public GcsImageStorageService(
             @Value("${app.gcs.bucket}") String bucket,
             @Value("${app.gcs.upload-prefix}") String uploadPrefix,
