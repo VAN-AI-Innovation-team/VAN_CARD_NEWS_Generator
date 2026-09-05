@@ -181,7 +181,7 @@ public class GcsImageStorageService implements ImageStorageService {
      * 공개 URL이 업로드용인지 생성 이미지용인지 구분해 객체 이름으로 되돌린다.
      * 로컬 구현과 동일하게, 크롭 결과처럼 생성 프리픽스에 있는 이미지도 다시 읽을 수 있어야 한다.
      */
-    private String resolveObjectName(String imageUrl) {
+    String resolveObjectName(String imageUrl) {
         String fileName = ImageUploadValidator.extractFileName(imageUrl);
 
         String prefix =

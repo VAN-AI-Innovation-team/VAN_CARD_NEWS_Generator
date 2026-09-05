@@ -56,6 +56,36 @@ class ImageStorageServiceTest {
     }
 
     @Test
+    void GCS도_공개URL의_프리픽스로_업로드와_생성_이미지를_구분한다() {
+        GcsImageStorageService storage = gcsStorage();
+
+        assertThat(storage.resolveObjectName(
+                "https://storage.googleapis.com/van-cards/generated/same-name.png"))
+                .isEqualTo("generated/same-name.png");
+
+        assertThat(storage.resolveObjectName(
+                "https://storage.googleapis.com/van-cards/uploads/same-name.png"))
+                .isEqualTo("uploads/same-name.png");
+    }
+
+    @Test
+    void GCS도_경로_탈출_시도는_거부한다() {
+        GcsImageStorageService storage = gcsStorage();
+
+        assertThatThrownBy(() -> storage.resolveObjectName(
+                "https://storage.googleapis.com/van-cards/uploads/.."))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_IMAGE_FILE);
+    }
+
+    @Test
+    void 버킷_설정이_비어_있으면_기동에_실패한다() {
+        assertThatThrownBy(() -> new GcsImageStorageService(null, "", "uploads", "generated"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.gcs.bucket");
+    }
+
+    @Test
     void gs_참조를_버킷과_객체명으로_분해한다() {
         BlobId blobId = GcsImageStorageService.parseBlobId("gs://van-cards/generated/card.png");
 
@@ -70,6 +100,11 @@ class ImageStorageServiceTest {
 
         assertThatThrownBy(() -> GcsImageStorageService.parseBlobId("gs://van-cards"))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    /** URL 해석은 GCS 호출을 타지 않으므로 클라이언트 없이 검증한다. */
+    private GcsImageStorageService gcsStorage() {
+        return new GcsImageStorageService(null, "van-cards", "uploads", "generated");
     }
 
     private LocalImageStorageService localStorage(Path tempDir) {
