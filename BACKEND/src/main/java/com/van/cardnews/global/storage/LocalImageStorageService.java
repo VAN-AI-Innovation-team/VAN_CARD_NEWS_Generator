@@ -4,7 +4,7 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@Profile("dev")
+@ConditionalOnExpression("'${app.gcs.bucket:}'.length() == 0")
 public class LocalImageStorageService implements ImageStorageService {
 
     private final Path uploadPath;

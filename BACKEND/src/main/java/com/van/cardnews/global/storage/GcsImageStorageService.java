@@ -10,7 +10,7 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,15 +22,19 @@ import java.util.UUID;
  * 이미지를 GCS 버킷에 저장한다.
  *
  * Cloud Run 인스턴스는 언제든 교체되므로 컨테이너 로컬 디스크에 저장한 이미지의 URL은
- * 곧 404가 된다. Meta가 발행 시점에 그 URL을 직접 가져가기 때문에 prod에서는 반드시
- * 인스턴스 수명과 무관한 스토리지를 써야 한다.
+ * 곧 404가 된다. Meta가 발행 시점에 그 URL을 직접 가져가기 때문에 배포 환경에서는
+ * 반드시 인스턴스 수명과 무관한 스토리지를 써야 한다.
+ *
+ * 활성화 조건은 프로필이 아니라 {@code app.gcs.bucket} 설정 여부다. 프로필 축에는
+ * OpenAI·Higgsfield 클라이언트도 묶여 있어, 스토리지 하나를 바꾸려고 프로필을 뒤집으면
+ * 무관한 외부 연동까지 함께 실구현으로 바뀌기 때문이다.
  *
  * 버킷은 공개 읽기(allUsers: Storage Object Viewer)로 두고, 인증은 Cloud Run
  * 서비스 계정의 Application Default Credentials를 사용한다.
  */
 @Slf4j
 @Service
-@Profile("prod")
+@ConditionalOnExpression("'${app.gcs.bucket:}'.length() > 0")
 public class GcsImageStorageService implements ImageStorageService {
 
     private static final String PUBLIC_BASE = "https://storage.googleapis.com/";
