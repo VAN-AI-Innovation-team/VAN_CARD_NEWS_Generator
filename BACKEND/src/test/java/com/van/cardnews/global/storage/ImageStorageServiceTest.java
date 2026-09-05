@@ -5,6 +5,10 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.lang.reflect.Constructor;
+import java.util.Arrays;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,6 +109,26 @@ class ImageStorageServiceTest {
     /** URL 해석은 GCS 호출을 타지 않으므로 클라이언트 없이 검증한다. */
     private GcsImageStorageService gcsStorage() {
         return new GcsImageStorageService(null, "van-cards", "uploads", "generated");
+    }
+
+    /**
+     * Spring은 생성자가 둘 이상이면 @Autowired가 붙은 것을 찾고, 없으면 기본 생성자를 찾는다.
+     * 이 클래스는 운영용(@Value 주입)과 테스트용(Storage 직접 주입) 생성자를 함께 두므로
+     * 표시가 빠지면 컨텍스트 기동이 실패한다. GCS_BUCKET이 설정된 환경에서만 이 빈이
+     * 생성되기 때문에 CI 기동 테스트로는 잡히지 않아 여기서 직접 검증한다.
+     */
+    @Test
+    void GCS_구현은_주입할_생성자가_하나로_정해져_있다() {
+        Constructor<?>[] constructors =
+                GcsImageStorageService.class.getDeclaredConstructors();
+
+        long annotated =
+                Arrays.stream(constructors)
+                        .filter(c -> c.isAnnotationPresent(Autowired.class))
+                        .count();
+
+        assertThat(constructors.length).isGreaterThan(1);
+        assertThat(annotated).isEqualTo(1);
     }
 
     private LocalImageStorageService localStorage(Path tempDir) {
