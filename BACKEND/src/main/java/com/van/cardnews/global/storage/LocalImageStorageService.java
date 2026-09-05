@@ -4,8 +4,8 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -13,22 +13,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
 @Service
+@ConditionalOnExpression("'${app.gcs.bucket:}'.length() == 0")
 public class LocalImageStorageService implements ImageStorageService {
-
-    private static final List<String> ALLOWED_CONTENT_TYPES =
-            List.of(
-                    "image/jpeg",
-                    "image/png",
-                    "image/webp"
-            );
-
-    private static final long MAX_FILE_SIZE_BYTES =
-            10L * 1024 * 1024;
 
     private final Path uploadPath;
     private final String uploadPublicBaseUrl;
@@ -57,11 +47,11 @@ public class LocalImageStorageService implements ImageStorageService {
 
     @Override
     public String store(MultipartFile file) {
-        validate(file);
+        ImageUploadValidator.validate(file);
 
         try {
             String extension =
-                    extractExtension(
+                    ImageUploadValidator.extractExtension(
                             file.getOriginalFilename()
                     );
 
@@ -114,6 +104,25 @@ public class LocalImageStorageService implements ImageStorageService {
     }
 
     @Override
+    public byte[] readRef(String storageRef) {
+        try {
+            return Files.readAllBytes(Paths.get(storageRef));
+
+        } catch (IOException e) {
+            log.error(
+                    "이미지 읽기 실패: {}",
+                    storageRef,
+                    e
+            );
+
+            throw new IllegalStateException(
+                    "다운로드할 이미지 파일을 찾을 수 없습니다: " + storageRef,
+                    e
+            );
+        }
+    }
+
+    @Override
     public String getContentType(String imageUrl) {
         try {
             Path imagePath =
@@ -123,7 +132,7 @@ public class LocalImageStorageService implements ImageStorageService {
                     Files.probeContentType(imagePath);
 
             if (contentType == null ||
-                    !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+                    !ImageUploadValidator.ALLOWED_CONTENT_TYPES.contains(contentType)) {
 
                 throw new CustomException(
                         ErrorCode.UNSUPPORTED_IMAGE_TYPE
@@ -158,60 +167,21 @@ public class LocalImageStorageService implements ImageStorageService {
         }
     }
 
+    /**
+     * 공개 URL이 업로드용인지 생성 이미지용인지 base URL로 구분해 실제 저장 경로로 해석한다.
+     * (크롭 결과처럼 생성 디렉터리에 저장된 이미지를 다시 읽을 수 있어야 한다.)
+     */
     private Path resolveStoredPath(String imageUrl) {
         String fileName =
-                imageUrl.substring(
-                        imageUrl.lastIndexOf('/') + 1
-                );
+                ImageUploadValidator.extractFileName(imageUrl);
 
-        if (!StringUtils.hasText(fileName) ||
-                fileName.contains("..") ||
-                fileName.contains("\\") ||
-                fileName.contains("/")) {
+        Path basePath =
+                imageUrl.startsWith(generatedPublicBaseUrl)
+                        ? generatedPath
+                        : uploadPath;
 
-            throw new CustomException(
-                    ErrorCode.INVALID_IMAGE_FILE
-            );
-        }
-
-        return uploadPath
+        return basePath
                 .resolve(fileName)
                 .normalize();
-    }
-
-    private void validate(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new CustomException(
-                    ErrorCode.INVALID_IMAGE_FILE
-            );
-        }
-
-        if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw new CustomException(
-                    ErrorCode.IMAGE_TOO_LARGE
-            );
-        }
-
-        if (!ALLOWED_CONTENT_TYPES.contains(
-                file.getContentType()
-        )) {
-            throw new CustomException(
-                    ErrorCode.UNSUPPORTED_IMAGE_TYPE
-            );
-        }
-    }
-
-    private String extractExtension(
-            String originalFilename
-    ) {
-        if (!StringUtils.hasText(originalFilename) ||
-                !originalFilename.contains(".")) {
-
-            return "";
-        }
-
-        return originalFilename.substring(
-                originalFilename.lastIndexOf('.')
-        );
     }
 }
