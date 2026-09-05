@@ -4,11 +4,11 @@
     push:
       branches:
         - main
-        - develop
+        - dev
     pull_request:
       branches:
         - main
-        - develop
+        - dev
 
   jobs:
     backend-test:
@@ -49,6 +49,12 @@
 
         - name: Run backend tests
           run: ./gradlew clean test
+          env:
+            DATABASE_URL: jdbc:postgresql://localhost:5432/van_card_news_db
+            DATABASE_USERNAME: postgres
+            DATABASE_PASSWORD: postgres
+            APP_UPLOAD_DIR: ${{ runner.temp }}/uploads
+            APP_GENERATED_DIR: ${{ runner.temp }}/generated
 
     frontend-build:
       name: Frontend Production Build
