@@ -5,6 +5,7 @@ import com.van.cardnews.domain.instagram.entity.InstagramToken;
 import com.van.cardnews.domain.instagram.repository.InstagramTokenRepository;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
+import com.van.cardnews.global.instagram.InstagramCredentials;
 import com.van.cardnews.global.instagram.InstagramTokenClient;
 import com.van.cardnews.global.time.KoreaTime;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +31,11 @@ public class InstagramTokenService {
     private final TokenCipher tokenCipher;
 
     /**
-     * 발행에 쓸 현재 액세스 토큰입니다. 호출할 때마다 DB에서 읽으므로 갱신 직후 값이 바로 보입니다.
+     * 발행에 쓸 현재 자격(ig_user_id + 액세스 토큰)입니다.
+     * 호출할 때마다 DB에서 읽으므로 갱신 직후 값이 바로 보입니다.
      */
     @Transactional(readOnly = true)
-    public String currentAccessToken() {
+    public InstagramCredentials current() {
         InstagramToken token = loadToken();
 
         if (token.isExpiredAt(KoreaTime.now())) {
@@ -42,7 +44,9 @@ public class InstagramTokenService {
                     "인스타그램 액세스 토큰이 만료되었습니다. 계정 관리자의 재인증이 필요합니다.");
         }
 
-        return tokenCipher.decrypt(token.getAccessTokenEncrypted());
+        return new InstagramCredentials(
+                token.getIgUserId(),
+                tokenCipher.decrypt(token.getAccessTokenEncrypted()));
     }
 
     /**

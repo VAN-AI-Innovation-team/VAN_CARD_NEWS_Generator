@@ -93,11 +93,11 @@ class InstagramTokenServiceTest {
     void 갱신한_토큰을_재기동_없이_바로_읽는다() {
         LocalDateTime issuedAt = KoreaTime.now().minusDays(30);
         givenToken(issuedAt, issuedAt.plusDays(60));
-        assertThat(service.currentAccessToken()).isEqualTo(DUMMY_TOKEN);
+        assertThat(service.current().accessToken()).isEqualTo(DUMMY_TOKEN);
 
         service.refresh();
 
-        assertThat(service.currentAccessToken())
+        assertThat(service.current().accessToken())
                 .isNotEqualTo(DUMMY_TOKEN)
                 .startsWith("mock-ig-long-lived-token-");
     }
@@ -110,7 +110,7 @@ class InstagramTokenServiceTest {
         TokenRefreshResponse response = service.refresh();
 
         assertThat(response.result()).isEqualTo(TokenRefreshResult.SKIPPED_TOO_EARLY);
-        assertThat(service.currentAccessToken()).isEqualTo(DUMMY_TOKEN);
+        assertThat(service.current().accessToken()).isEqualTo(DUMMY_TOKEN);
         assertThat(storedToken.getLastRefreshedAt()).isNull();
     }
 
@@ -156,7 +156,7 @@ class InstagramTokenServiceTest {
         givenToken(issuedAt, issuedAt.plusDays(60));
 
         service.refresh();
-        String newToken = service.currentAccessToken();
+        String newToken = service.current().accessToken();
 
         assertThat(allLogs()).doesNotContain(DUMMY_TOKEN).doesNotContain(newToken);
         assertThat(storedToken.toString()).doesNotContain(newToken);
@@ -167,14 +167,14 @@ class InstagramTokenServiceTest {
         storedToken = null;
 
         assertThatThrownBy(() -> service.refresh()).isInstanceOf(CustomException.class);
-        assertThatThrownBy(() -> service.currentAccessToken()).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.current()).isInstanceOf(CustomException.class);
     }
 
     @Test
     void 만료된_토큰은_발행에_쓰지_않는다() {
         givenToken(KoreaTime.now().minusDays(61), KoreaTime.now().minusMinutes(1));
 
-        assertThatThrownBy(() -> service.currentAccessToken())
+        assertThatThrownBy(() -> service.current())
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining("재인증");
     }
