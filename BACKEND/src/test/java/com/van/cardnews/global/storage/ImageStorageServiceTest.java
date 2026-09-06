@@ -128,7 +128,7 @@ class ImageStorageServiceTest {
         GcsImageStorageService service =
                 new GcsImageStorageService(storage, "van-cards", "uploads", "generated");
 
-        byte[] jpeg = ImageBytes.toJpeg(onePixelPng());
+        byte[] jpeg = ImageBytes.toJpeg(onePixelPng()).bytes();
 
         service.save(jpeg, "card.jpg");
 

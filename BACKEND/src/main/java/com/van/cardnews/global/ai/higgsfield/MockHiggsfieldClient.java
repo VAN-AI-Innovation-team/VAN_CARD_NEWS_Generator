@@ -219,9 +219,7 @@ public class MockHiggsfieldClient implements HiggsfieldClient {
             return new HiggsfieldGenerationResult.GeneratedCard(
                     cardType,
                     cardIndex,
-                    output.toByteArray(),
-                    width,
-                    height
+                    output.toByteArray()
             );
 
         } catch (IOException e) {

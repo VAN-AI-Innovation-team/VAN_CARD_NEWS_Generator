@@ -180,9 +180,7 @@ public class HiggsfieldClientImpl implements HiggsfieldClient {
         return new HiggsfieldGenerationResult.GeneratedCard(
                 cardType,
                 cardIndex,
-                imageBytes,
-                request.canvasWidth(),
-                request.canvasHeight()
+                imageBytes
         );
     }
 
