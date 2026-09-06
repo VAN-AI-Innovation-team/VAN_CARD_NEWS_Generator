@@ -1,16 +1,20 @@
 package com.van.cardnews.domain.publish.service;
 
+import com.van.cardnews.domain.approval.entity.ApprovalStatus;
+import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.instagram.service.InstagramTokenService;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
+import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import com.van.cardnews.global.instagram.InstagramCredentials;
 import com.van.cardnews.global.publish.instagram.InstagramClient;
+import com.van.cardnews.global.time.KoreaTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +40,12 @@ public class InstagramPublishService {
 
     public static final String CHANNEL = "INSTAGRAM";
 
+    /** 아직 결과가 확정되지 않은 상태 — 이 중 하나라도 있으면 새 요청을 받지 않는다. */
+    private static final List<PublishStatus> ACTIVE_STATUSES =
+            List.of(PublishStatus.SCHEDULED, PublishStatus.PENDING, PublishStatus.PROCESSING);
+
     private final ContentRepository contentRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final PublishRecordRepository publishRecordRepository;
     private final InstagramTokenService instagramTokenService;
@@ -50,28 +59,93 @@ public class InstagramPublishService {
     private int maxPollCount;
 
     /**
-     * 콘텐츠의 카드 이미지를 캐러셀 한 건으로 발행하고 결과를 기록합니다.
+     * 발행을 큐에 등록합니다. 실제 호출은 워커가 {@link #execute(Long)}로 수행합니다.
+     *
+     * 즉시 발행도 {@code scheduled_at = now()}인 예약 발행으로 통합했습니다.
+     * Cloud Run은 요청 처리 중이 아니면 CPU를 주지 않아 {@code @Async}로 5분짜리 폴링을
+     * 돌릴 수 없고, 경로를 하나로 두어야 검증·이력·재시도가 갈라지지 않습니다.
+     */
+    @Transactional
+    public PublishRecord enqueue(Long contentId, String caption) {
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        validateApproved(contentId);
+        validateNotPublishedYet(contentId);
+        validateCardImagesReady(contentId);
+
+        return publishRecordRepository.save(
+                PublishRecord.schedule(content, CHANNEL, caption, KoreaTime.now()));
+    }
+
+    /**
+     * 큐에 등록된 발행 건을 실제로 실행합니다. 워커(VAN-11)가 도래한 건마다 호출합니다.
      *
      * 발행 실패는 예외로 올리지 않고 {@code FAILED}로 기록해 돌려줍니다.
      * 예외를 던지면 트랜잭션이 롤백되어 실패 기록 자체가 사라지고, 재시도(VAN-13)가 근거를 잃습니다.
      */
     @Transactional
-    public PublishRecord publishNow(Long contentId, String caption) {
-        Content content = contentRepository.findById(contentId)
-                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+    public PublishRecord execute(Long publishRecordId) {
+        PublishRecord record = publishRecordRepository.findById(publishRecordId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
 
-        PublishRecord record = publishRecordRepository.save(
-                PublishRecord.publishNow(content, CHANNEL, caption));
         record.markProcessing();
 
         try {
-            publishCarousel(record, contentId, caption);
+            publishCarousel(record, record.getContent().getId(), record.getCaption());
         } catch (Exception e) {
             record.markFailed(e.getMessage());
-            log.error("인스타그램 발행 실패 — contentId={}, publishRecordId={}", contentId, record.getId(), e);
+            log.error("인스타그램 발행 실패 — publishRecordId={}", publishRecordId, e);
         }
 
         return record;
+    }
+
+    /**
+     * 최신 발행 건입니다. 예약(SCHEDULED)이든 완료(SUCCESS)든 화면은 이 한 건만 보면 됩니다.
+     */
+    @Transactional(readOnly = true)
+    public PublishRecord latest(Long contentId) {
+        return publishRecordRepository.findByContentIdOrderByIdDesc(contentId).stream()
+                .filter(record -> CHANNEL.equals(record.getChannel()))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
+    }
+
+    /** 다운로드와 같은 정책 — 최신 승인요청이 APPROVED여야 한다. */
+    private void validateApproved(Long contentId) {
+        boolean approved = approvalRequestRepository
+                .findTopByContentIdOrderByRequestedAtDesc(contentId)
+                .map(request -> request.getStatus() == ApprovalStatus.APPROVED)
+                .orElse(false);
+
+        if (!approved) {
+            throw new CustomException(ErrorCode.CONTENT_NOT_APPROVED_FOR_PUBLISH);
+        }
+    }
+
+    /**
+     * 같은 콘텐츠를 두 번 올리거나, 진행 중인 건 위에 겹쳐 요청하는 것을 막습니다.
+     * SUCCESS 중복은 DB의 부분 유니크 인덱스도 막지만, 사용자에게는 500이 아니라 409로 답해야 합니다.
+     */
+    private void validateNotPublishedYet(Long contentId) {
+        for (PublishRecord record : publishRecordRepository.findByContentIdOrderByIdDesc(contentId)) {
+            if (!CHANNEL.equals(record.getChannel())) {
+                continue;
+            }
+            if (record.getStatus() == PublishStatus.SUCCESS) {
+                throw new CustomException(ErrorCode.CONTENT_ALREADY_PUBLISHED);
+            }
+            if (ACTIVE_STATUSES.contains(record.getStatus())) {
+                throw new CustomException(ErrorCode.PUBLISH_ALREADY_REQUESTED);
+            }
+        }
+    }
+
+    private void validateCardImagesReady(Long contentId) {
+        if (generatedCardImageRepository.countByContent_Id(contentId) == 0) {
+            throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
+        }
     }
 
     private void publishCarousel(PublishRecord record, Long contentId, String caption) {
@@ -101,6 +175,9 @@ public class InstagramPublishService {
 
         String igMediaId = instagramClient.publishContainer(credentials, containerId);
         record.markSuccess(igMediaId, instagramClient.getPermalink(credentials, igMediaId));
+
+        // 다운로드는 더 이상 PUBLISHED로 전이시키지 않는다. 실제 외부 발행만 이 상태를 만든다.
+        record.getContent().publish();
 
         log.info("인스타그램 발행 완료 — contentId={}, igMediaId={}, 카드 {}장", contentId, igMediaId, cards.size());
     }
