@@ -83,14 +83,9 @@ public class DownloadHistoryService {
                         new CustomException(ErrorCode.DOWNLOAD_HISTORY_NOT_FOUND)
                 );
 
+        // 다운로드는 발행이 아닙니다. contents.status = PUBLISHED는
+        // 인스타그램 발행에 성공한 경우에만 전이합니다.
         history.markSuccess();
-
-        // 현재 프로젝트에서는 외부 게시 대신 최종 결과물 다운로드를
-        // 발행 완료 시점으로 간주합니다.
-        Content content = history.getContent();
-        if (content.getStatus() != com.van.cardnews.domain.content.entity.ContentStatus.PUBLISHED) {
-            content.publish();
-        }
     }
 
     /**
