@@ -122,6 +122,31 @@ public enum ErrorCode {
     INSTAGRAM_TOKEN_REFRESH_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "인스타그램 액세스 토큰 갱신에 실패했습니다."
+    ),
+
+    CONTENT_NOT_APPROVED_FOR_PUBLISH(
+            HttpStatus.FORBIDDEN,
+            "승인 완료된 콘텐츠만 발행할 수 있습니다."
+    ),
+
+    PUBLISH_ALREADY_REQUESTED(
+            HttpStatus.CONFLICT,
+            "이미 진행 중인 발행 건이 있습니다."
+    ),
+
+    CONTENT_ALREADY_PUBLISHED(
+            HttpStatus.CONFLICT,
+            "이미 발행된 콘텐츠입니다."
+    ),
+
+    CARD_IMAGES_NOT_READY(
+            HttpStatus.BAD_REQUEST,
+            "발행할 카드 이미지가 없습니다. 카드 이미지를 먼저 생성해 주세요."
+    ),
+
+    PUBLISH_RECORD_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "발행 이력을 찾을 수 없습니다."
     );
 
     private final HttpStatus status;
