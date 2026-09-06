@@ -112,6 +112,16 @@ public enum ErrorCode {
     CONTENT_NOT_APPROVED(
             HttpStatus.FORBIDDEN,
             "승인 완료된 작업물만 다운로드할 수 있습니다."
+    ),
+
+    INSTAGRAM_TOKEN_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "저장된 인스타그램 액세스 토큰이 없습니다."
+    ),
+
+    INSTAGRAM_TOKEN_REFRESH_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "인스타그램 액세스 토큰 갱신에 실패했습니다."
     );
 
     private final HttpStatus status;
