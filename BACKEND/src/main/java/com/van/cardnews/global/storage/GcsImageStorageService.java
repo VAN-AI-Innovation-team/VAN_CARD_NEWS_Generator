@@ -8,6 +8,7 @@ import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
+import com.van.cardnews.global.image.ImageBytes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +40,6 @@ import java.util.UUID;
 public class GcsImageStorageService implements ImageStorageService {
 
     private static final String PUBLIC_BASE = "https://storage.googleapis.com/";
-    private static final String GENERATED_CONTENT_TYPE = "image/png";
 
     private final Storage storage;
     private final String bucket;
@@ -156,7 +156,9 @@ public class GcsImageStorageService implements ImageStorageService {
         String objectName = generatedPrefix + "/" + fileName;
 
         try {
-            upload(objectName, imageBytes, GENERATED_CONTENT_TYPE);
+            // 확장자가 아니라 실제 바이트로 판정한다. 객체 메타데이터의 Content-Type을
+            // Meta가 그대로 읽어가므로 내용과 어긋나면 발행이 거부된다.
+            upload(objectName, imageBytes, ImageBytes.contentType(imageBytes));
 
         } catch (StorageException e) {
             log.error("생성된 이미지 저장 실패: {}", objectName, e);

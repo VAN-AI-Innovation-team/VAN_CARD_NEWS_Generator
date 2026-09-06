@@ -1,6 +1,7 @@
 package com.van.cardnews.domain.generatedimage.service;
 
 import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
+import com.van.cardnews.global.image.ImageBytes;
 import com.van.cardnews.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,10 +23,12 @@ public class GeneratedImageZipService {
              ZipOutputStream zos = new ZipOutputStream(baos)) {
 
             for (GeneratedCardImage image : images) {
+                byte[] bytes = imageStorageService.readRef(image.getStorageRef());
+
                 String entryName = image.getCardType().name().toLowerCase()
-                        + "-" + image.getCardIndex() + ".png";
+                        + "-" + image.getCardIndex() + ImageBytes.extension(bytes);
                 zos.putNextEntry(new ZipEntry(entryName));
-                zos.write(imageStorageService.readRef(image.getStorageRef()));
+                zos.write(bytes);
                 zos.closeEntry();
             }
             zos.finish();
