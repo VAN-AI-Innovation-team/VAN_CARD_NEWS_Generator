@@ -48,6 +48,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // OpenAI SDK는 OpenAIOkHttpClient.fromEnv()로 환경변수를 직접 읽으므로 스프링
+    // 프로퍼티로 주입할 수 없다. prod 프로필 빈 생성 테스트에 필요한 더미 값이며,
+    // 키 존재만 확인하고 네트워크는 타지 않는다. 실 키는 절대 쓰지 않는다.
+    environment 'OPENAI_API_KEY', 'test-dummy-key'
 }
 
 jar {

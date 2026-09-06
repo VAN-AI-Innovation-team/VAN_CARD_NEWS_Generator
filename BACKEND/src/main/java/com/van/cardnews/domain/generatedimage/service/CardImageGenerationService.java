@@ -65,8 +65,7 @@ public class CardImageGenerationService {
             for (HiggsfieldGenerationResult.GeneratedCard card : result.cards()) {
                 GeneratedCardImage.CardType cardType = mapCardType(card.cardType());
                 saved.add(persist(
-                        content, cardType, card.cardIndex(), sortOrder++,
-                        card.imageBytes(), card.width(), card.height()
+                        content, cardType, card.cardIndex(), sortOrder++, card.imageBytes()
                 ));
             }
 
@@ -86,22 +85,21 @@ public class CardImageGenerationService {
             GeneratedCardImage.CardType cardType,
             int cardIndex,
             int sortOrder,
-            byte[] imageBytes,
-            int width,
-            int height
+            byte[] imageBytes
     ) {
-        // Instagram은 알파 없는 sRGB JPEG만 받는다. 발행 시점에 변환하면 원본과 변환본을
-        // 따로 들고 있어야 하므로, 모든 카드 바이트가 지나가는 이 지점에서 한 번만 변환한다.
-        byte[] publishableBytes = ImageBytes.toJpeg(imageBytes);
+        // Instagram은 알파 없는 sRGB JPEG만 받고 폭 상한도 있다. 발행 시점에 변환하면
+        // 원본과 변환본을 따로 들고 있어야 하므로, 모든 카드 바이트가 지나가는 이 지점에서
+        // 한 번만 변환한다. 크기는 변환 결과에서 읽는다 — 리사이즈되면 값이 달라진다.
+        ImageBytes.Jpeg jpeg = ImageBytes.toJpeg(imageBytes);
 
         String fileName = "content-" + content.getId() + "-" + cardType.name().toLowerCase()
-                + "-" + cardIndex + "-" + UUID.randomUUID() + ImageBytes.extension(publishableBytes);
-        ImageStorageService.StoredImage stored = imageStorageService.save(publishableBytes, fileName);
+                + "-" + cardIndex + "-" + UUID.randomUUID() + ImageBytes.extension(jpeg.bytes());
+        ImageStorageService.StoredImage stored = imageStorageService.save(jpeg.bytes(), fileName);
 
         // 💡 4. GeneratedCardImage.create 인자 순서에 맞게 정확히 매핑
         GeneratedCardImage entity = GeneratedCardImage.create(
                 content, cardType, cardIndex, sortOrder,
-                stored.publicUrl(), width, height, stored.storageRef()
+                stored.publicUrl(), jpeg.width(), jpeg.height(), stored.storageRef()
         );
         return generatedCardImageRepository.save(entity);
     }

@@ -26,7 +26,7 @@ class ImageBytesTest {
     void 투명_ARGB_PNG를_흰_배경_JPEG로_변환한다() throws IOException {
         byte[] png = transparentArgbPng(1080, 1350);
 
-        byte[] jpeg = ImageBytes.toJpeg(png);
+        byte[] jpeg = ImageBytes.toJpeg(png).bytes();
 
         assertThat(ImageBytes.contentType(jpeg)).isEqualTo("image/jpeg");
 
@@ -59,7 +59,38 @@ class ImageBytesTest {
 
         assertThat(ImageBytes.contentType(png)).isEqualTo("image/png");
         assertThat(ImageBytes.extension(png)).isEqualTo(".png");
-        assertThat(ImageBytes.extension(ImageBytes.toJpeg(png))).isEqualTo(".jpg");
+        assertThat(ImageBytes.extension(ImageBytes.toJpeg(png).bytes())).isEqualTo(".jpg");
+    }
+
+    /**
+     * prod의 HiggsfieldClientImpl은 resolution "2K"로 요청하므로 Meta 폭 상한(1440)을 넘는
+     * 이미지가 실제로 들어온다. dev 목업(1080)에서는 이 로직이 no-op이라 목업 데이터만으로는
+     * 한 줄도 실행되지 않으므로, prod 조건의 합성 입력으로 직접 검증한다.
+     */
+    @Test
+    void 폭이_1440을_넘으면_비율을_유지한_채_축소한다() throws IOException {
+        byte[] oversized = transparentArgbPng(2048, 2560);
+
+        ImageBytes.Jpeg jpeg = ImageBytes.toJpeg(oversized);
+
+        assertThat(jpeg.width()).isEqualTo(1440);
+        assertThat(jpeg.height()).isEqualTo(1800); // 2560 * 1440 / 2048, 4:5 유지
+
+        // 돌려준 크기가 실제 바이트와 일치해야 한다 — 이 값이 그대로 DB에 들어간다.
+        BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(jpeg.bytes()));
+        assertThat(decoded.getWidth()).isEqualTo(jpeg.width());
+        assertThat(decoded.getHeight()).isEqualTo(jpeg.height());
+    }
+
+    @Test
+    void 폭이_1440_이하면_확대하지_않는다() throws IOException {
+        ImageBytes.Jpeg square = ImageBytes.toJpeg(transparentArgbPng(1080, 1080));
+        assertThat(square.width()).isEqualTo(1080);
+        assertThat(square.height()).isEqualTo(1080);
+
+        ImageBytes.Jpeg portrait = ImageBytes.toJpeg(transparentArgbPng(1080, 1350));
+        assertThat(portrait.width()).isEqualTo(1080);
+        assertThat(portrait.height()).isEqualTo(1350);
     }
 
     @Test
