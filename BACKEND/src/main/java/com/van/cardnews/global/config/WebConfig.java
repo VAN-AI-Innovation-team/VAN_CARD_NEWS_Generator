@@ -5,8 +5,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -14,11 +18,20 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
+import java.util.function.Supplier;
 
 @EnableAsync
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
+
+    /** Cloud Scheduler가 내부 트리거 엔드포인트를 호출할 때 실어 보내는 헤더 */
+    public static final String SCHEDULER_SECRET_HEADER = "X-Scheduler-Secret";
+
+    @Value("${app.internal.scheduler-secret}")
+    private String schedulerSecret;
 
     @Value("${app.cors.allowed-origins}")
     private String[] allowedOrigins;
@@ -74,9 +87,31 @@ public class WebConfig implements WebMvcConfigurer {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/**", "/uploads/**", "/generated/**").permitAll()
+                        .requestMatchers("/internal/**").access(this::hasSchedulerSecret)
                         .anyRequest().authenticated()
                 );
 
         return http.build();
+    }
+
+    /**
+     * 내부 트리거 엔드포인트의 공유 시크릿 검증.
+     * 시크릿이 주입되지 않았으면 통과시킬 값이 없으므로 전면 거부한다(빈 문자열 우회 방지).
+     */
+    private AuthorizationDecision hasSchedulerSecret(Supplier<Authentication> authentication,
+                                                     RequestAuthorizationContext context) {
+        if (!StringUtils.hasText(schedulerSecret)) {
+            return new AuthorizationDecision(false);
+        }
+
+        String provided = context.getRequest().getHeader(SCHEDULER_SECRET_HEADER);
+        if (provided == null) {
+            return new AuthorizationDecision(false);
+        }
+
+        // 앞자리부터 비교하다 멈추면 응답 시간 차로 값을 추측당할 수 있어 상수시간 비교를 쓴다
+        return new AuthorizationDecision(MessageDigest.isEqual(
+                schedulerSecret.getBytes(StandardCharsets.UTF_8),
+                provided.getBytes(StandardCharsets.UTF_8)));
     }
 }
