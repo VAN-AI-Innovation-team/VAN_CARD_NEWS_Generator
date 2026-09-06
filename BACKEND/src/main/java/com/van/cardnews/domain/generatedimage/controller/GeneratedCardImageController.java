@@ -11,6 +11,7 @@ import com.van.cardnews.domain.download.entity.DownloadType;
 import com.van.cardnews.domain.download.service.DownloadHistoryService;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
+import com.van.cardnews.global.image.ImageBytes;
 import com.van.cardnews.global.storage.ImageStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -84,23 +85,22 @@ public class GeneratedCardImageController {
                 throw new IllegalStateException("다운로드할 이미지 저장 경로가 없습니다.");
             }
 
-            Resource resource = new ByteArrayResource(
-                    imageStorageService.readRef(image.getStorageRef())
-            );
+            byte[] bytes = imageStorageService.readRef(image.getStorageRef());
 
             downloadHistoryService.markSuccess(historyId);
 
             return ResponseEntity.ok()
-                    .contentType(MediaType.IMAGE_PNG)
+                    .contentType(MediaType.parseMediaType(ImageBytes.contentType(bytes)))
                     .header(
                             HttpHeaders.CONTENT_DISPOSITION,
                             "attachment; filename=\"" +
                                     image.getCardType().name().toLowerCase() +
                                     "-" +
                                     image.getCardIndex() +
-                                    ".png\""
+                                    ImageBytes.extension(bytes) +
+                                    "\""
                     )
-                    .body(resource);
+                    .body(new ByteArrayResource(bytes));
 
         } catch (Exception e) {
             downloadHistoryService.markFailed(

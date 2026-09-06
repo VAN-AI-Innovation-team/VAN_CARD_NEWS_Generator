@@ -1,12 +1,20 @@
 package com.van.cardnews.global.storage;
 
 import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
+import com.van.cardnews.global.image.ImageBytes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 
@@ -15,6 +23,9 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * 스토리지 참조/공개 URL 해석 규칙 검증.
@@ -104,6 +115,34 @@ class ImageStorageServiceTest {
 
         assertThatThrownBy(() -> GcsImageStorageService.parseBlobId("gs://van-cards"))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    /**
+     * 이 빈은 app.gcs.bucket이 설정된 환경에서만 뜨므로 CI 기동 테스트로는 한 번도 실행되지 않는다.
+     * 객체 메타데이터의 Content-Type은 Meta가 발행 시점에 그대로 읽어가는 값이라,
+     * 확장자가 아니라 실제 바이트로 정해지는지 여기서 직접 검증한다.
+     */
+    @Test
+    void GCS_저장은_실제_바이트로_ContentType을_정한다() throws IOException {
+        Storage storage = mock(Storage.class);
+        GcsImageStorageService service =
+                new GcsImageStorageService(storage, "van-cards", "uploads", "generated");
+
+        byte[] jpeg = ImageBytes.toJpeg(onePixelPng());
+
+        service.save(jpeg, "card.jpg");
+
+        ArgumentCaptor<BlobInfo> captor = ArgumentCaptor.forClass(BlobInfo.class);
+        verify(storage).create(captor.capture(), eq(jpeg));
+
+        assertThat(captor.getValue().getContentType()).isEqualTo("image/jpeg");
+        assertThat(captor.getValue().getBlobId().getName()).isEqualTo("generated/card.jpg");
+    }
+
+    private byte[] onePixelPng() throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), "png", output);
+        return output.toByteArray();
     }
 
     /** URL 해석은 GCS 호출을 타지 않으므로 클라이언트 없이 검증한다. */

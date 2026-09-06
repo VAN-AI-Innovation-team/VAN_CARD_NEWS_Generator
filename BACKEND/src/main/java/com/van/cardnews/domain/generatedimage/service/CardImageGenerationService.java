@@ -7,6 +7,7 @@ import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepos
 import com.van.cardnews.domain.jobhistory.entity.JobHistory;
 import com.van.cardnews.domain.jobhistory.entity.JobType;
 import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
+import com.van.cardnews.global.image.ImageBytes;
 import com.van.cardnews.global.storage.ImageStorageService;
 import com.van.cardnews.global.ai.higgsfield.HiggsfieldClient;
 import com.van.cardnews.global.ai.higgsfield.dto.HiggsfieldGenerationRequest;
@@ -89,9 +90,13 @@ public class CardImageGenerationService {
             int width,
             int height
     ) {
+        // Instagram은 알파 없는 sRGB JPEG만 받는다. 발행 시점에 변환하면 원본과 변환본을
+        // 따로 들고 있어야 하므로, 모든 카드 바이트가 지나가는 이 지점에서 한 번만 변환한다.
+        byte[] publishableBytes = ImageBytes.toJpeg(imageBytes);
+
         String fileName = "content-" + content.getId() + "-" + cardType.name().toLowerCase()
-                + "-" + cardIndex + "-" + UUID.randomUUID() + ".png";
-        ImageStorageService.StoredImage stored = imageStorageService.save(imageBytes, fileName);
+                + "-" + cardIndex + "-" + UUID.randomUUID() + ImageBytes.extension(publishableBytes);
+        ImageStorageService.StoredImage stored = imageStorageService.save(publishableBytes, fileName);
 
         // 💡 4. GeneratedCardImage.create 인자 순서에 맞게 정확히 매핑
         GeneratedCardImage entity = GeneratedCardImage.create(
