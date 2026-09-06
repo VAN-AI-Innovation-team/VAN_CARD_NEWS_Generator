@@ -5,6 +5,8 @@ import com.van.cardnews.global.ai.higgsfield.HiggsfieldClientImpl;
 import com.van.cardnews.global.ai.higgsfield.MockHiggsfieldClient;
 import com.van.cardnews.global.ai.openai.MockOpenAIClient;
 import com.van.cardnews.global.ai.openai.OpenAIClientImpl;
+import com.van.cardnews.global.instagram.InstagramTokenClientImpl;
+import com.van.cardnews.global.instagram.MockInstagramTokenClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -36,8 +38,10 @@ class ProdProfileClientBeanTest {
                 .withUserConfiguration(
                         OpenAIClientImpl.class,
                         HiggsfieldClientImpl.class,
+                        InstagramTokenClientImpl.class,
                         MockOpenAIClient.class,
-                        MockHiggsfieldClient.class
+                        MockHiggsfieldClient.class,
+                        MockInstagramTokenClient.class
                 );
     }
 
@@ -47,6 +51,7 @@ class ProdProfileClientBeanTest {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(OpenAIClientImpl.class);
             assertThat(context).hasSingleBean(HiggsfieldClientImpl.class);
+            assertThat(context).hasSingleBean(InstagramTokenClientImpl.class);
         });
     }
 
@@ -55,6 +60,7 @@ class ProdProfileClientBeanTest {
         runner("prod").run(context -> {
             assertThat(context).doesNotHaveBean(MockOpenAIClient.class);
             assertThat(context).doesNotHaveBean(MockHiggsfieldClient.class);
+            assertThat(context).doesNotHaveBean(MockInstagramTokenClient.class);
         });
     }
 
@@ -65,8 +71,10 @@ class ProdProfileClientBeanTest {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(MockOpenAIClient.class);
             assertThat(context).hasSingleBean(MockHiggsfieldClient.class);
+            assertThat(context).hasSingleBean(MockInstagramTokenClient.class);
             assertThat(context).doesNotHaveBean(OpenAIClientImpl.class);
             assertThat(context).doesNotHaveBean(HiggsfieldClientImpl.class);
+            assertThat(context).doesNotHaveBean(InstagramTokenClientImpl.class);
         });
     }
 }
