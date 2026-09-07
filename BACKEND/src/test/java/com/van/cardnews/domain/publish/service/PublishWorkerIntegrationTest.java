@@ -1,5 +1,8 @@
 package com.van.cardnews.domain.publish.service;
 
+import com.van.cardnews.domain.content.entity.Content;
+import com.van.cardnews.domain.content.repository.ContentRepository;
+import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
 import com.van.cardnews.global.publish.instagram.MockInstagramClient;
@@ -11,8 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +45,9 @@ class PublishWorkerIntegrationTest {
 
     @Autowired
     private MockInstagramClient instagramClient;
+
+    @Autowired
+    private ContentRepository contentRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -156,27 +162,30 @@ class PublishWorkerIntegrationTest {
 
     // ------------------------------------------------------------------
 
+    /**
+     * 발행 건은 raw SQL이 아니라 엔티티·레포지토리로 넣는다.
+     *
+     * 워커의 판정은 전부 시각 비교이고, LocalDateTime이 TIMESTAMPTZ에 어떤 순간으로 저장되는지는
+     * 바인딩 경로에 달려 있다. 픽스처가 다른 경로를 쓰면 앱이 쓴 값과 다른 순간이 들어가
+     * 테스트가 조용히 다른 것을 검증한다(실제로 CI에서 9시간 어긋났다).
+     */
     private Long insertScheduled(LocalDateTime scheduledAt) {
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO publish_records (content_id, channel, status, scheduled_at, caption)
-                VALUES (?, 'INSTAGRAM', 'SCHEDULED', ?, '캡션')
-                RETURNING id
-                """, Long.class, contentId, toTimestamp(scheduledAt));
+        return publishRecordRepository.save(PublishRecord.schedule(
+                content(), InstagramPublishService.CHANNEL, "캡션", scheduledAt)).getId();
     }
 
+    /** 워커가 선점만 해 놓고 죽은 상태를 만든다. */
     private Long insertProcessing(LocalDateTime processingStartedAt) {
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO publish_records (content_id, channel, status, scheduled_at,
-                                             processing_started_at, caption)
-                VALUES (?, 'INSTAGRAM', 'PROCESSING', ?, ?, '캡션')
-                RETURNING id
-                """, Long.class, contentId,
-                toTimestamp(processingStartedAt), toTimestamp(processingStartedAt));
+        PublishRecord record = PublishRecord.schedule(
+                content(), InstagramPublishService.CHANNEL, "캡션", processingStartedAt);
+        record.markProcessing();
+        ReflectionTestUtils.setField(record, "processingStartedAt", processingStartedAt);
+
+        return publishRecordRepository.save(record).getId();
     }
 
-    /** 컬럼이 TIMESTAMPTZ이므로 서울 벽시계를 그 자리의 순간으로 바꿔 넣는다(CI JVM은 UTC다). */
-    private Timestamp toTimestamp(LocalDateTime seoulWallClock) {
-        return Timestamp.from(seoulWallClock.atZone(KoreaTime.ZONE_ID).toInstant());
+    private Content content() {
+        return contentRepository.findById(contentId).orElseThrow();
     }
 
     private String statusOf(Long recordId) {
