@@ -58,3 +58,27 @@ export async function downloadApprovedCards(contentId: number): Promise<Blob> {
   );
   return response.data;
 }
+
+
+export interface InstagramPublishResponse {
+  publishRecordId: number;
+  contentId: number;
+  channel: string;
+  status: string;
+  scheduledAt: string | null;
+  igMediaId: string | null;
+  permalink: string | null;
+  errorMessage: string | null;
+  retryCount: number;
+  requestedAt: string;
+  publishedAt: string | null;
+}
+
+export async function publishApprovedContentToInstagram(
+  contentId: number,
+): Promise<InstagramPublishResponse> {
+  const response = await axios.post<InstagramPublishResponse>(
+    `/api/contents/${contentId}/publish/instagram`,
+  );
+  return response.data;
+}
