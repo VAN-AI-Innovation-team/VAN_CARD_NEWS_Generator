@@ -44,6 +44,9 @@ class PublishWorkerIntegrationTest {
     private PublishRecordRepository publishRecordRepository;
 
     @Autowired
+    private InstagramPublishService instagramPublishService;
+
+    @Autowired
     private MockInstagramClient instagramClient;
 
     @Autowired
@@ -84,6 +87,10 @@ class PublishWorkerIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        // contents FK가 ON DELETE RESTRICT라 발행이 남긴 이력을 먼저 지워야 콘텐츠가 지워진다.
+        jdbcTemplate.update("DELETE FROM job_histories WHERE content_id = ?", contentId);
+        jdbcTemplate.update("DELETE FROM audit_logs WHERE target_id = ?", contentId);
+        jdbcTemplate.update("DELETE FROM approval_requests WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM publish_records WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM generated_card_images WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM contents WHERE id = ?", contentId);
@@ -219,5 +226,41 @@ class PublishWorkerIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 작업이력·감사로그 (V10 CHECK 제약 확인)
+    // ------------------------------------------------------------------
+
+    /** 새 job_type이 CHECK 제약을 통과하는지는 실제 DB에서만 판정된다. */
+    @Test
+    void 발행에_성공하면_작업이력에_permalink가_남는다() {
+        Long recordId = insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runDue();
+
+        String permalink = jdbcTemplate.queryForObject(
+                "SELECT permalink FROM publish_records WHERE id = ?", String.class, recordId);
+        String resultUrl = jdbcTemplate.queryForObject("""
+                SELECT result_url FROM job_histories
+                WHERE content_id = ? AND job_type = 'INSTAGRAM_PUBLISH' AND status = 'COMPLETED'
+                """, String.class, contentId);
+
+        assertThat(resultUrl).isNotNull().isEqualTo(permalink);
+    }
+
+    /** 같은 이유로 audit_logs.action의 새 값도 실제 DB에서 확인한다. */
+    @Test
+    void 발행_요청은_감사로그에_PUBLISH로_남는다() {
+        jdbcTemplate.update("""
+                INSERT INTO approval_requests (content_id, requester_id, approver_id, status, processed_at)
+                VALUES (?, 'tester', 'approver', 'APPROVED', CURRENT_TIMESTAMP)
+                """, contentId);
+
+        instagramPublishService.enqueue(contentId, "캡션", "tester");
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT actor_id FROM audit_logs WHERE target_id = ? AND action = 'PUBLISH'",
+                String.class, contentId)).isEqualTo("tester");
     }
 }
