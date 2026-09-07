@@ -1,6 +1,7 @@
 package com.van.cardnews.domain.publish.entity;
 
 import com.van.cardnews.domain.content.entity.Content;
+import com.van.cardnews.global.publish.instagram.PublishFailure;
 import com.van.cardnews.global.time.KoreaTime;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -67,6 +68,13 @@ public class PublishRecord {
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
+
+    /**
+     * 마지막 실패의 원인 분류입니다. 재시도 여부와 사용자 메시지가 이 값에서 나옵니다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_type", length = 30)
+    private PublishFailure failureType;
 
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
@@ -137,25 +145,31 @@ public class PublishRecord {
         this.permalink = permalink;
         this.publishedAt = KoreaTime.now();
         this.errorMessage = null;
-    }
-
-    public void markFailed(String errorMessage) {
-        this.status = PublishStatus.FAILED;
-        this.errorMessage = errorMessage;
+        this.failureType = null;
     }
 
     /**
-     * 실패한 건을 다시 큐에 넣습니다.
+     * 실패를 기록하고 재시도 여부까지 같은 자리에서 판정합니다.
+     *
+     * 재시도 가능한 원인이고 상한이 남았으면 <b>새 행을 만들지 않고 이 행을 뒤로 재예약</b>합니다.
+     * 그러면 워커의 기존 도래 조회가 그대로 집어가므로 재시도 전용 경로가 필요 없고,
+     * 시도 횟수와 마지막 원인이 한 행에 모입니다.
+     *
+     * 재예약은 원인별 지연을 둡니다. 레이트리밋을 즉시 다시 치면 한도만 더 깎입니다.
      */
-    public void retry() {
-        if (this.status != PublishStatus.FAILED) {
-            throw new IllegalStateException("실패한 발행 건만 재시도할 수 있습니다.");
+    public void fail(PublishFailure failure, int maxRetryCount) {
+        this.failureType = failure;
+        this.errorMessage = failure.getUserMessage();
+        this.processingStartedAt = null;
+
+        if (failure.isRetryable() && this.retryCount < maxRetryCount) {
+            this.retryCount++;
+            this.status = PublishStatus.SCHEDULED;
+            this.scheduledAt = KoreaTime.now().plus(failure.getRetryDelay());
+            return;
         }
 
-        this.retryCount++;
-        this.status = PublishStatus.PENDING;
-        this.errorMessage = null;
-        this.processingStartedAt = null;
+        this.status = PublishStatus.FAILED;
     }
 
     /**

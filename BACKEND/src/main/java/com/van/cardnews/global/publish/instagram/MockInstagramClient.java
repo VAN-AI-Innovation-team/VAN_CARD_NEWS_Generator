@@ -23,7 +23,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>상태 전이 — 첫 조회는 {@code IN_PROGRESS}, 그 다음부터 {@code FINISHED}.
  *       한 번은 반드시 돌게 해서 폴링 루프 자체가 dev에서 실행되게 한다</li>
  *   <li>호출 기록({@link #calls()}) — 테스트가 호출 횟수·순서를 단언할 수 있다</li>
- *   <li>실패 주입({@link #failAt(Step)}) — 발행 실패 분기(VAN-13)를 검증할 유일한 수단이다</li>
+ *   <li>실패 주입({@link #failAt(Step, PublishFailure)}) — 발행 실패 분기(VAN-13)를 검증할 유일한 수단이다.
+ *       토큰 만료·레이트리밋·이미지 fetch 실패는 실 API로도 재현할 수 없으므로 전환 후에도 여기가 유일한 검증 경로다</li>
  * </ul>
  */
 @Component
@@ -47,6 +48,7 @@ public class MockInstagramClient implements InstagramClient {
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private final Map<String, AtomicInteger> statusChecks = new ConcurrentHashMap<>();
     private volatile Step failAt;
+    private volatile PublishFailure failure = PublishFailure.UNKNOWN;
 
     @Override
     public String createCarouselItem(InstagramCredentials credentials, String imageUrl, String altText) {
@@ -54,7 +56,7 @@ public class MockInstagramClient implements InstagramClient {
         calls.add("createCarouselItem:" + imageUrl + (altText == null ? "" : "|alt"));
 
         if (failAt == Step.CREATE_ITEM) {
-            throw new IllegalStateException("자식 컨테이너 생성 실패 (mock)");
+            throw new InstagramPublishException(failure, "자식 컨테이너 생성 실패 (mock)");
         }
 
         return "mock-child-" + sequence.incrementAndGet();
@@ -71,7 +73,7 @@ public class MockInstagramClient implements InstagramClient {
             throw new IllegalArgumentException("캐러셀은 1~" + MAX_CAROUSEL_ITEMS + "장이어야 합니다.");
         }
         if (failAt == Step.CREATE_CONTAINER) {
-            throw new IllegalStateException("캐러셀 컨테이너 생성 실패 (mock)");
+            throw new InstagramPublishException(failure, "캐러셀 컨테이너 생성 실패 (mock)");
         }
 
         return "mock-carousel-" + sequence.incrementAndGet();
@@ -104,7 +106,7 @@ public class MockInstagramClient implements InstagramClient {
         calls.add("publishContainer:" + containerId);
 
         if (failAt == Step.PUBLISH) {
-            throw new IllegalStateException("발행 실패 (mock)");
+            throw new InstagramPublishException(failure, "발행 실패 (mock)");
         }
 
         return "mock-media-" + sequence.incrementAndGet();
@@ -123,12 +125,23 @@ public class MockInstagramClient implements InstagramClient {
         return new ArrayList<>(calls);
     }
 
+    /** 원인을 지정하지 않은 실패입니다. 상태 반환으로 끝나는 단계(STATUS_*)는 원인이 상태 자체로 정해집니다. */
     public void failAt(Step step) {
+        failAt(step, PublishFailure.UNKNOWN);
+    }
+
+    /**
+     * 지정한 단계에서 지정한 원인으로 실패시킵니다.
+     * 토큰 만료·레이트리밋·이미지 fetch 실패는 어느 호출에서든 돌아올 수 있으므로 단계와 원인을 따로 받습니다.
+     */
+    public void failAt(Step step, PublishFailure failure) {
         this.failAt = step;
+        this.failure = failure;
     }
 
     public void reset() {
         this.failAt = null;
+        this.failure = PublishFailure.UNKNOWN;
         this.calls.clear();
         this.statusChecks.clear();
     }
