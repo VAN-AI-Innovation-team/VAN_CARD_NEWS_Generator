@@ -60,6 +60,7 @@ public class InstagramPublishService {
     private final PublishPreflightValidator preflightValidator;
     private final AuditLogService auditLogService;
     private final JobHistoryService jobHistoryService;
+    private final PublishTextComposer textComposer;
 
     /** Meta 권장치. Higgsfield의 2초 간격을 복사하면 과호출이 된다. */
     @Value("${app.publish.instagram.poll-interval-ms}")
@@ -141,11 +142,17 @@ public class InstagramPublishService {
             throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
         }
 
+        // 캡션을 지정하지 않으면 카드 구성 결과에서 만든다. 여기서 확정해 두어야 사전 검증이 실제로
+        // 나갈 문구를 보고, 예약 건도 등록 시점의 문구로 고정된다.
+        String finalCaption = caption == null || caption.isBlank()
+                ? textComposer.caption(content)
+                : caption;
+
         // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
-        preflightValidator.validate(cards, caption);
+        preflightValidator.validate(cards, finalCaption);
 
         PublishRecord record = publishRecordRepository.save(
-                PublishRecord.schedule(content, CHANNEL, caption, scheduledAt));
+                PublishRecord.schedule(content, CHANNEL, finalCaption, scheduledAt));
 
         // 감사로그는 요청 시점에 남긴다. 실제 발행은 워커가 하므로 그때는 행위자를 알 수 없다.
         auditLogService.record(
@@ -292,8 +299,8 @@ public class InstagramPublishService {
 
         List<String> childIds = new ArrayList<>();
         for (GeneratedCardImage card : cards) {
-            // 대체 텍스트 생성은 VAN-8. 그때까지는 alt_text 없이 보낸다.
-            childIds.add(instagramClient.createCarouselItem(credentials, card.getImageUrl(), null));
+            childIds.add(instagramClient.createCarouselItem(
+                    credentials, card.getImageUrl(), textComposer.altText(record.getContent(), card)));
         }
 
         // 컨테이너는 생성 후 24시간에 만료되므로 재시도 때도 매번 새로 만든다(재사용 금지).

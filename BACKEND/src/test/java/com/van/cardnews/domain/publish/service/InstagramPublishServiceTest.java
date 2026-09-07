@@ -42,6 +42,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +57,7 @@ class InstagramPublishServiceTest {
 
     private static final long CONTENT_ID = 42L;
     private static final String ACTOR_ID = "hanms";
+    private static final String COMPOSED_CAPTION = "조립된 캡션";
     private static final long RECORD_ID = 7L;
     private static final int MAX_POLL_COUNT = 3;
     private static final long MIN_LEAD_MINUTES = 5;
@@ -70,6 +73,7 @@ class InstagramPublishServiceTest {
     private PublishPreflightValidator preflightValidator;
     private AuditLogService auditLogService;
     private JobHistoryService jobHistoryService;
+    private PublishTextComposer textComposer;
     private List<JobHistory> jobHistories;
     private InstagramPublishService service;
 
@@ -126,6 +130,12 @@ class InstagramPublishServiceTest {
 
         auditLogService = mock(AuditLogService.class);
 
+        // 조립 규칙 자체는 PublishTextComposerTest가 본다. 여기서 보는 것은 연결이다 —
+        // 캡션 미지정 시 조립된 문구가 저장되는가, 카드마다 대체 텍스트가 넘어가는가.
+        textComposer = mock(PublishTextComposer.class);
+        lenient().when(textComposer.caption(any())).thenReturn(COMPOSED_CAPTION);
+        lenient().when(textComposer.altText(any(), any())).thenReturn("대체 텍스트");
+
         jobHistories = new ArrayList<>();
         jobHistoryService = mock(JobHistoryService.class);
         lenient().when(jobHistoryService.createJobHistory(any(), any()))
@@ -145,7 +155,8 @@ class InstagramPublishServiceTest {
                 instagramClient,
                 preflightValidator,
                 auditLogService,
-                jobHistoryService);
+                jobHistoryService,
+                textComposer);
 
         ReflectionTestUtils.setField(service, "pollIntervalMs", 1L);
         ReflectionTestUtils.setField(service, "maxPollCount", MAX_POLL_COUNT);
@@ -292,8 +303,8 @@ class InstagramPublishServiceTest {
 
         assertThat(instagramClient.calls()).containsExactly(
                 "remainingQuota",
-                "createCarouselItem:https://example.com/card-0.jpg",
-                "createCarouselItem:https://example.com/card-1.jpg",
+                "createCarouselItem:https://example.com/card-0.jpg|alt",
+                "createCarouselItem:https://example.com/card-1.jpg|alt",
                 "createCarouselContainer:2|caption",
                 "getContainerStatus:mock-carousel-3",
                 "getContainerStatus:mock-carousel-3",
@@ -645,5 +656,39 @@ class InstagramPublishServiceTest {
         publish("캡션");
 
         assertThat(jobHistories).isEmpty();
+    }
+    // ------------------------------------------------------------------
+    // 캡션·대체 텍스트 연결
+    // ------------------------------------------------------------------
+
+    @Test
+    void 캡션을_지정하지_않으면_조립한_캡션을_고정_보관한다() {
+        givenCards(3);
+
+        PublishRecord record = service.enqueue(CONTENT_ID, null, ACTOR_ID);
+
+        assertThat(record.getCaption()).isEqualTo(COMPOSED_CAPTION);
+        // 사전 검증도 실제로 나갈 문구를 봐야 한다.
+        verify(preflightValidator).validate(any(), eq(COMPOSED_CAPTION));
+    }
+
+    @Test
+    void 캡션을_지정하면_조립하지_않는다() {
+        givenCards(3);
+
+        PublishRecord record = service.enqueue(CONTENT_ID, "직접 쓴 캡션", ACTOR_ID);
+
+        assertThat(record.getCaption()).isEqualTo("직접 쓴 캡션");
+        verify(textComposer, never()).caption(any());
+    }
+
+    @Test
+    void 카드마다_대체_텍스트를_만들어_넘긴다() {
+        givenCards(3);
+
+        publish("캡션");
+
+        verify(textComposer, times(3)).altText(any(), any());
+        assertThat(callCount("createCarouselItem")).isEqualTo(3);
     }
 }

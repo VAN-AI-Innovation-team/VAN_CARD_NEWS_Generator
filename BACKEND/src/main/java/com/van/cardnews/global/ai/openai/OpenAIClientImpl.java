@@ -40,6 +40,14 @@ public class OpenAIClientImpl implements com.van.cardnews.global.ai.openai.OpenA
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 실구현이 돌려주는 문구는 모두 실제로 생성된 것이므로 걸러낼 자리 채움이 없습니다.
+     */
+    @Override
+    public boolean isPlaceholder(String fieldPath, String value) {
+        return false;
+    }
+
     @Override
     public CardGenerationResult generateCardContent(
             CardGenerationRequest request
