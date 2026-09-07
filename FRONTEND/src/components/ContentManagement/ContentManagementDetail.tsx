@@ -75,6 +75,8 @@ export default function ContentManagementDetail({
   const [isCloning, setIsCloning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | null>(null);
+  const [publishPermalink, setPublishPermalink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const generationInProgress =
@@ -226,16 +228,30 @@ export default function ContentManagementDetail({
 
     try {
       setIsPublishing(true);
+      setPublishStatus('PENDING');
+      setPublishPermalink(null);
       setError(null);
+
       const result = await publishApprovedContentToInstagram(content.contentId);
 
       if (result.status === 'FAILED') {
         throw new Error(result.errorMessage ?? 'Instagram 게시에 실패했습니다.');
       }
 
+      setPublishStatus(
+        result.status === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING',
+      );
+
+      if (result.status === 'SUCCESS') {
+        setPublishPermalink(result.permalink);
+        onUpdated();
+        return;
+      }
+
       onUpdated();
       await load(true);
     } catch (e) {
+      setPublishStatus('FAILED');
       setError(e instanceof Error ? e.message : 'Instagram 게시에 실패했습니다.');
     } finally {
       setIsPublishing(false);
@@ -418,14 +434,35 @@ export default function ContentManagementDetail({
                   {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
                 </button>
 
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => void publish()}
-                  disabled={isPublishing}
-                >
-                  {isPublishing ? 'Instagram 게시 중...' : 'Instagram 게시'}
-                </button>
+                {publishStatus === 'SUCCESS' ? (
+                  publishPermalink ? (
+                    <a
+                      className="primary-button"
+                      href={publishPermalink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Instagram 게시 완료 · 보기
+                    </a>
+                  ) : (
+                    <button type="button" className="primary-button" disabled>
+                      Instagram 게시 완료
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => void publish()}
+                    disabled={isPublishing}
+                  >
+                    {isPublishing || publishStatus === 'PROCESSING'
+                      ? 'Instagram 게시 중...'
+                      : publishStatus === 'FAILED'
+                        ? '다시 게시'
+                        : 'Instagram 게시'}
+                  </button>
+                )}
               </>
             ) : status === 'REJECTED' ? (
               /* 4. 반려 */
