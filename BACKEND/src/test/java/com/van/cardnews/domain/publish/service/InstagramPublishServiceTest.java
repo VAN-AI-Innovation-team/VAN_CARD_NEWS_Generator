@@ -15,10 +15,12 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import com.van.cardnews.global.instagram.InstagramCredentials;
 import com.van.cardnews.global.publish.instagram.MockInstagramClient;
+import com.van.cardnews.global.time.KoreaTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +46,8 @@ class InstagramPublishServiceTest {
     private static final long CONTENT_ID = 42L;
     private static final long RECORD_ID = 7L;
     private static final int MAX_POLL_COUNT = 3;
+    private static final long MIN_LEAD_MINUTES = 5;
+    private static final long MAX_HORIZON_DAYS = 30;
 
     private Content content;
     private List<GeneratedCardImage> cards;
@@ -109,6 +113,8 @@ class InstagramPublishServiceTest {
 
         ReflectionTestUtils.setField(service, "pollIntervalMs", 1L);
         ReflectionTestUtils.setField(service, "maxPollCount", MAX_POLL_COUNT);
+        ReflectionTestUtils.setField(service, "minLeadMinutes", MIN_LEAD_MINUTES);
+        ReflectionTestUtils.setField(service, "maxHorizonDays", MAX_HORIZON_DAYS);
     }
 
     private void givenCards(int count) {
@@ -317,6 +323,83 @@ class InstagramPublishServiceTest {
         assertThatThrownBy(() -> service.execute(RECORD_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.PUBLISH_RECORD_NOT_FOUND.getDefaultMessage());
+    }
+
+    // ------------------------------------------------------------------
+    // 예약 등록·취소
+    // ------------------------------------------------------------------
+
+    @Test
+    void 예약은_지정한_시각으로_큐에_등록되고_캡션이_고정된다() {
+        givenCards(3);
+        LocalDateTime scheduledAt = KoreaTime.now().plusMinutes(10);
+
+        PublishRecord record = service.schedule(CONTENT_ID, "예약 캡션", scheduledAt);
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+        assertThat(record.getScheduledAt()).isEqualTo(scheduledAt);
+        assertThat(record.getCaption()).isEqualTo("예약 캡션");
+        // 컨테이너는 24시간에 만료되므로 등록 시점에 미리 만들어 두지 않는다
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    @Test
+    void 과거_시각_예약은_거절한다() {
+        givenCards(3);
+
+        assertThatThrownBy(() -> service.schedule(CONTENT_ID, "캡션", KoreaTime.now().minusMinutes(1)))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
+    }
+
+    @Test
+    void 최소_리드타임보다_가까운_예약은_거절한다() {
+        givenCards(3);
+
+        assertThatThrownBy(() -> service.schedule(
+                CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(MIN_LEAD_MINUTES - 1)))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
+    }
+
+    @Test
+    void 최대_예약_기간을_넘기면_거절한다() {
+        givenCards(3);
+
+        assertThatThrownBy(() -> service.schedule(
+                CONTENT_ID, "캡션", KoreaTime.now().plusDays(MAX_HORIZON_DAYS).plusMinutes(1)))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
+    }
+
+    @Test
+    void 예약을_취소하면_CANCELED가_되고_같은_콘텐츠를_다시_예약할_수_있다() {
+        givenCards(3);
+        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10));
+
+        assertThat(service.cancel(CONTENT_ID).getStatus()).isEqualTo(PublishStatus.CANCELED);
+        assertThat(service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(20)).getStatus())
+                .isEqualTo(PublishStatus.SCHEDULED);
+    }
+
+    @Test
+    void 워커가_선점한_건은_취소할_수_없다() {
+        givenCards(3);
+        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10)).markProcessing();
+
+        assertThatThrownBy(() -> service.cancel(CONTENT_ID))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.PUBLISH_ALREADY_PROCESSING.getDefaultMessage());
+    }
+
+    @Test
+    void 이미_발행된_건은_취소할_수_없다() {
+        givenCards(1);
+        publish("캡션");
+
+        assertThatThrownBy(() -> service.cancel(CONTENT_ID))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.CONTENT_ALREADY_PUBLISHED.getDefaultMessage());
     }
 
     // ------------------------------------------------------------------
