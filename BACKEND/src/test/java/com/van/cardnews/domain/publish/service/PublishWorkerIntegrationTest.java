@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.publish.service;
 
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
@@ -44,7 +46,7 @@ class PublishWorkerIntegrationTest {
     private PublishRecordRepository publishRecordRepository;
 
     @Autowired
-    private InstagramPublishService instagramPublishService;
+    private AuditLogService auditLogService;
 
     @Autowired
     private MockInstagramClient instagramClient;
@@ -90,7 +92,6 @@ class PublishWorkerIntegrationTest {
         // contents FK가 ON DELETE RESTRICT라 발행이 남긴 이력을 먼저 지워야 콘텐츠가 지워진다.
         jdbcTemplate.update("DELETE FROM job_histories WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM audit_logs WHERE target_id = ?", contentId);
-        jdbcTemplate.update("DELETE FROM approval_requests WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM publish_records WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM generated_card_images WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM contents WHERE id = ?", contentId);
@@ -249,15 +250,15 @@ class PublishWorkerIntegrationTest {
         assertThat(resultUrl).isNotNull().isEqualTo(permalink);
     }
 
-    /** 같은 이유로 audit_logs.action의 새 값도 실제 DB에서 확인한다. */
+    /**
+     * 같은 이유로 audit_logs.action의 새 값도 실제 DB에서 확인한다.
+     *
+     * 발행 요청 경로(enqueue) 대신 기록 지점을 직접 부르는 이유는, 사전 검증이 카드 이미지 URL로
+     * 실제 HTTP HEAD를 보내기 때문이다. 이 픽스처의 example.com URL은 CI에서 도달하지 못한다.
+     */
     @Test
-    void 발행_요청은_감사로그에_PUBLISH로_남는다() {
-        jdbcTemplate.update("""
-                INSERT INTO approval_requests (content_id, requester_id, approver_id, status, processed_at)
-                VALUES (?, 'tester', 'approver', 'APPROVED', CURRENT_TIMESTAMP)
-                """, contentId);
-
-        instagramPublishService.enqueue(contentId, "캡션", "tester");
+    void 발행_감사로그는_PUBLISH로_남는다() {
+        auditLogService.record("tester", AuditAction.PUBLISH, contentId, "인스타그램 발행 요청");
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT actor_id FROM audit_logs WHERE target_id = ? AND action = 'PUBLISH'",
