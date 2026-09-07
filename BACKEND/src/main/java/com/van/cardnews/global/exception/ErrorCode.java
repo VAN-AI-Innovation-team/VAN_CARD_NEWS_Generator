@@ -157,6 +157,27 @@ public enum ErrorCode {
     PUBLISH_ALREADY_PROCESSING(
             HttpStatus.CONFLICT,
             "발행이 이미 진행 중이라 취소할 수 없습니다."
+    ),
+
+    INVALID_CARD_COUNT(
+            HttpStatus.BAD_REQUEST,
+            "인스타그램 캐러셀은 2~10장이어야 합니다."
+    ),
+
+    INVALID_CAPTION(
+            HttpStatus.BAD_REQUEST,
+            "캡션이 인스타그램 제한을 넘었습니다."
+    ),
+
+    /** 생성 경로가 규격을 맞춰 놓으므로, 여기서 걸리면 요청이 아니라 생성이 깨진 것이다. */
+    INVALID_PUBLISH_IMAGE(
+            HttpStatus.BAD_REQUEST,
+            "카드 이미지가 인스타그램 규격에 맞지 않습니다. 카드 이미지를 다시 생성해 주세요."
+    ),
+
+    PUBLISH_IMAGE_UNREACHABLE(
+            HttpStatus.BAD_REQUEST,
+            "카드 이미지 URL에 외부에서 접근할 수 없습니다. 이미지 저장소 공개 설정을 확인해 주세요."
     );
 
     private final HttpStatus status;

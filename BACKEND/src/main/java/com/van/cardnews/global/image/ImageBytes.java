@@ -34,8 +34,11 @@ public final class ImageBytes {
      * Meta 이미지 규격의 폭 상한. dev 프로필의 1080px 카드에서는 아무 일도 하지 않지만,
      * prod의 {@code HiggsfieldClientImpl}은 {@code resolution: "2K"}로 요청하므로
      * 실제로 이 값을 넘는 이미지가 들어온다.
+     *
+     * 발행 사전 검증(PublishPreflightValidator)도 이 상한을 그대로 방어선으로 쓴다.
+     * 규격의 출처는 Meta 하나이므로 상수도 하나여야 한다.
      */
-    private static final int MAX_WIDTH = 1440;
+    public static final int MAX_WIDTH = 1440;
 
     private ImageBytes() {
     }

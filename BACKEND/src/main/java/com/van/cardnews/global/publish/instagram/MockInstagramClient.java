@@ -44,11 +44,15 @@ public class MockInstagramClient implements InstagramClient {
         PUBLISH
     }
 
+    /** Meta의 24시간 한도. 목업은 소진되지 않은 상태를 기본으로 둔다. */
+    private static final int DEFAULT_REMAINING_QUOTA = 100;
+
     private final AtomicLong sequence = new AtomicLong();
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private final Map<String, AtomicInteger> statusChecks = new ConcurrentHashMap<>();
     private volatile Step failAt;
     private volatile PublishFailure failure = PublishFailure.UNKNOWN;
+    private volatile int remainingQuota = DEFAULT_REMAINING_QUOTA;
 
     @Override
     public String createCarouselItem(InstagramCredentials credentials, String imageUrl, String altText) {
@@ -120,6 +124,19 @@ public class MockInstagramClient implements InstagramClient {
         return "https://www.instagram.com/p/" + igMediaId + "/";
     }
 
+    @Override
+    public int remainingQuota(InstagramCredentials credentials) {
+        requireCredentials(credentials);
+        calls.add("remainingQuota");
+
+        return remainingQuota;
+    }
+
+    /** 쿼터 소진 경로를 재현합니다. 실 계정에서는 100건을 실제로 올려야 재현되므로 여기가 유일한 검증 수단입니다. */
+    public void setRemainingQuota(int remainingQuota) {
+        this.remainingQuota = remainingQuota;
+    }
+
     /** 이번 세션의 호출 기록입니다. 순서대로 쌓입니다. */
     public List<String> calls() {
         return new ArrayList<>(calls);
@@ -142,6 +159,7 @@ public class MockInstagramClient implements InstagramClient {
     public void reset() {
         this.failAt = null;
         this.failure = PublishFailure.UNKNOWN;
+        this.remainingQuota = DEFAULT_REMAINING_QUOTA;
         this.calls.clear();
         this.statusChecks.clear();
     }
