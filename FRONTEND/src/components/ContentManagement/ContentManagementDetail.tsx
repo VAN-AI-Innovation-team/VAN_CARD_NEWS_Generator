@@ -12,6 +12,11 @@ import {
   type ContentPreviewResponse,
   type GeneratedCardImageResponse,
 } from '../../api/contentApi';
+import {
+  fetchInstagramPublishStatus,
+  publishToInstagram,
+  type PublishRecordResponse,
+} from '../../api/publishApi';
 import './ContentManagementDetail.css';
 
 type ApprovalState = ApprovalRequestResponse & {
@@ -73,6 +78,8 @@ export default function ContentManagementDetail({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState<PublishRecordResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const generationInProgress =
@@ -186,6 +193,55 @@ export default function ContentManagementDetail({
       );
     } finally {
       setIsCloning(false);
+    }
+  }
+
+  async function publish() {
+    if (
+      isPublishing ||
+      approval?.status !== 'APPROVED' ||
+      content.contentStatus === 'PUBLISHED'
+    ) {
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      setError(null);
+
+      const queued = await publishToInstagram(content.contentId);
+      setPublishResult(queued);
+
+      let current = queued;
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (current.status === 'SUCCESS') {
+          setPublishResult(current);
+          onUpdated();
+          return;
+        }
+
+        if (current.status === 'FAILED' || current.status === 'CANCELED') {
+          setPublishResult(current);
+          throw new Error(
+            current.errorMessage ?? '인스타그램 게시에 실패했습니다.',
+          );
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        current = await fetchInstagramPublishStatus(content.contentId);
+        setPublishResult(current);
+      }
+
+      throw new Error(
+        '인스타그램 게시 결과를 확인하는 데 시간이 걸리고 있습니다. 콘텐츠 관리에서 잠시 후 상태를 확인해주세요.',
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : '인스타그램 게시에 실패했습니다.',
+      );
+    } finally {
+      setIsPublishing(false);
     }
   }
 
@@ -385,14 +441,60 @@ export default function ContentManagementDetail({
               </button>
             ) : status === 'APPROVED' ? (
               /* 3. 승인 완료 */
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => void download()}
-                disabled={isDownloading}
-              >
-                {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void download()}
+                  disabled={isDownloading || isPublishing}
+                >
+                  {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => void publish()}
+                  disabled={isPublishing}
+                >
+                  {isPublishing
+                    ? publishResult?.status === 'PROCESSING'
+                      ? 'Instagram 게시 중...'
+                      : 'Instagram 게시 요청 중...'
+                    : 'Instagram 게시'}
+                </button>
+              </>
+            ) : content.contentStatus === 'PUBLISHED' ? (
+              /* 4. Instagram 게시 완료 */
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void download()}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
+                </button>
+
+                {publishResult?.permalink ? (
+                  <a
+                    className="primary-button content-management-detail__instagram-link"
+                    href={publishResult.permalink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Instagram 게시 완료 · 보기
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled
+                  >
+                    Instagram 게시 완료
+                  </button>
+                )}
+              </>
             ) : status === 'REJECTED' ? (
               /* 4. 반려 */
               <>
