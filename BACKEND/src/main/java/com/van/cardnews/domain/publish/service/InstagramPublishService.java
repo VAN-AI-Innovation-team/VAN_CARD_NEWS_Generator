@@ -14,6 +14,8 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import com.van.cardnews.global.instagram.InstagramCredentials;
 import com.van.cardnews.global.publish.instagram.InstagramClient;
+import com.van.cardnews.global.publish.instagram.InstagramPublishException;
+import com.van.cardnews.global.publish.instagram.PublishFailure;
 import com.van.cardnews.global.time.KoreaTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +67,10 @@ public class InstagramPublishService {
 
     @Value("${app.publish.schedule.max-horizon-days}")
     private long maxHorizonDays;
+
+    /** 자동 재시도 상한. 넘기면 사용자가 다시 요청해야 한다. */
+    @Value("${app.publish.retry.max-count}")
+    private int maxRetryCount;
 
     /**
      * 발행을 큐에 등록합니다. 실제 호출은 워커가 {@link #execute(Long)}로 수행합니다.
@@ -141,8 +147,12 @@ public class InstagramPublishService {
     /**
      * 큐에 등록된 발행 건을 실제로 실행합니다. 워커(VAN-11)가 도래한 건마다 호출합니다.
      *
-     * 발행 실패는 예외로 올리지 않고 {@code FAILED}로 기록해 돌려줍니다.
-     * 예외를 던지면 트랜잭션이 롤백되어 실패 기록 자체가 사라지고, 재시도(VAN-13)가 근거를 잃습니다.
+     * 발행 실패는 예외로 올리지 않고 기록해 돌려줍니다.
+     * 예외를 던지면 트랜잭션이 롤백되어 실패 기록 자체가 사라지고, 재시도가 근거를 잃습니다.
+     *
+     * 재시도 가능한 원인이면 {@link PublishRecord#fail}이 같은 행을 뒤로 재예약하므로
+     * 워커의 다음 회차가 그대로 집어갑니다. 그때 자식 컨테이너부터 다시 만들므로
+     * 만료된 컨테이너를 재사용하는 경로 자체가 없습니다.
      */
     @Transactional
     public PublishRecord execute(Long publishRecordId) {
@@ -154,11 +164,39 @@ public class InstagramPublishService {
         try {
             publishCarousel(record, record.getContent().getId(), record.getCaption());
         } catch (Exception e) {
-            record.markFailed(e.getMessage());
-            log.error("인스타그램 발행 실패 — publishRecordId={}", publishRecordId, e);
+            PublishFailure failure = classify(e);
+            record.fail(failure, maxRetryCount);
+
+            if (failure == PublishFailure.TOKEN_EXPIRED) {
+                // 알림 채널이 아직 없어 error 로그가 유일한 신호다. 재시도로는 풀리지 않고 사람이 재인증해야 한다.
+                log.error("인스타그램 토큰 만료로 발행 중단 — publishRecordId={}. 계정 관리자의 재인증이 필요하다.",
+                        publishRecordId, e);
+            } else {
+                log.error("인스타그램 발행 실패 — publishRecordId={}, 원인={}, 재시도예약={}, 시도={}회",
+                        publishRecordId, failure,
+                        record.getStatus() == PublishStatus.SCHEDULED, record.getRetryCount(), e);
+            }
         }
 
         return record;
+    }
+
+    /**
+     * 예외를 실패 유형으로 옮깁니다.
+     *
+     * 클라이언트가 판정한 유형이 있으면 그대로 쓰고, 발행 전 자격 조회에서 걸린 토큰 만료도 같은 유형으로 모읍니다.
+     * 그 외는 {@code UNKNOWN}이라 재시도 대상입니다 — 원인을 모른다고 발행을 포기하지는 않습니다.
+     */
+    private PublishFailure classify(Exception e) {
+        if (e instanceof InstagramPublishException published) {
+            return published.getFailure();
+        }
+        if (e instanceof CustomException custom
+                && custom.getErrorCode() == ErrorCode.INSTAGRAM_TOKEN_NOT_FOUND) {
+            return PublishFailure.TOKEN_EXPIRED;
+        }
+
+        return PublishFailure.UNKNOWN;
     }
 
     /**
@@ -213,10 +251,12 @@ public class InstagramPublishService {
                 generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
 
         if (cards.isEmpty()) {
-            throw new IllegalStateException("발행할 카드 이미지가 없습니다.");
+            throw new InstagramPublishException(
+                    PublishFailure.INVALID_CARDS, "발행할 카드 이미지가 없습니다.");
         }
         if (cards.size() > InstagramClient.MAX_CAROUSEL_ITEMS) {
-            throw new IllegalStateException(
+            throw new InstagramPublishException(
+                    PublishFailure.INVALID_CARDS,
                     "캐러셀은 최대 " + InstagramClient.MAX_CAROUSEL_ITEMS + "장입니다. 현재 " + cards.size() + "장");
         }
 
@@ -254,14 +294,17 @@ public class InstagramPublishService {
                 case FINISHED, PUBLISHED -> {
                     return;
                 }
-                case ERROR -> throw new IllegalStateException("컨테이너 처리가 실패했습니다 (ERROR).");
-                case EXPIRED -> throw new IllegalStateException(
+                case ERROR -> throw new InstagramPublishException(
+                        PublishFailure.CONTAINER_ERROR, "컨테이너 처리가 실패했습니다 (ERROR).");
+                case EXPIRED -> throw new InstagramPublishException(
+                        PublishFailure.CONTAINER_EXPIRED,
                         "컨테이너가 만료됐습니다 (EXPIRED). 생성 후 24시간이 지나면 재사용할 수 없습니다.");
                 case IN_PROGRESS -> sleepBeforeNextPoll(attempt);
             }
         }
 
-        throw new IllegalStateException(
+        throw new InstagramPublishException(
+                PublishFailure.UNKNOWN,
                 "컨테이너 처리가 " + maxPollCount + "회 폴링(" + pollIntervalMs + "ms 간격) 안에 끝나지 않았습니다.");
     }
 

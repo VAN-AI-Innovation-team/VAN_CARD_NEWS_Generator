@@ -57,7 +57,7 @@ public interface PublishRecordRepository
      *
      * 워커가 발행 도중 죽으면(인스턴스 강제 종료 등) 그 건은 아무도 손대지 않아 영구 정체됩니다.
      * SCHEDULED로 되돌리지 않고 FAILED로 두는 이유는, 되돌리면 매번 죽는 건이 무한히 재선점되기 때문입니다.
-     * 재시도는 {@link PublishRecord#retry()}가 FAILED만 받도록 되어 있어 정책(VAN-13)이 판단합니다.
+     * 회수된 건은 원인을 모르므로 failure_type 없이 FAILED로 남습니다. 다시 올릴지는 사용자가 판단합니다.
      */
     @Transactional
     @Modifying(clearAutomatically = true)

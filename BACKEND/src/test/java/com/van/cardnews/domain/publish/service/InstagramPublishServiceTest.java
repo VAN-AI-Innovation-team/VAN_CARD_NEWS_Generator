@@ -15,6 +15,7 @@ import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
 import com.van.cardnews.global.instagram.InstagramCredentials;
 import com.van.cardnews.global.publish.instagram.MockInstagramClient;
+import com.van.cardnews.global.publish.instagram.PublishFailure;
 import com.van.cardnews.global.time.KoreaTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,12 +49,14 @@ class InstagramPublishServiceTest {
     private static final int MAX_POLL_COUNT = 3;
     private static final long MIN_LEAD_MINUTES = 5;
     private static final long MAX_HORIZON_DAYS = 30;
+    private static final int MAX_RETRY_COUNT = 2;
 
     private Content content;
     private List<GeneratedCardImage> cards;
     private List<PublishRecord> savedRecords;
     private ApprovalStatus approvalStatus;
     private MockInstagramClient instagramClient;
+    private InstagramTokenService tokenService;
     private InstagramPublishService service;
 
     @BeforeEach
@@ -99,7 +102,7 @@ class InstagramPublishServiceTest {
                     return reversed;
                 });
 
-        InstagramTokenService tokenService = mock(InstagramTokenService.class);
+        tokenService = mock(InstagramTokenService.class);
         lenient().when(tokenService.current())
                 .thenReturn(new InstagramCredentials("dev-ig-user", "dev-dummy-ig-long-lived-token"));
 
@@ -115,6 +118,7 @@ class InstagramPublishServiceTest {
         ReflectionTestUtils.setField(service, "maxPollCount", MAX_POLL_COUNT);
         ReflectionTestUtils.setField(service, "minLeadMinutes", MIN_LEAD_MINUTES);
         ReflectionTestUtils.setField(service, "maxHorizonDays", MAX_HORIZON_DAYS);
+        ReflectionTestUtils.setField(service, "maxRetryCount", MAX_RETRY_COUNT);
     }
 
     private void givenCards(int count) {
@@ -200,7 +204,7 @@ class InstagramPublishServiceTest {
     @Test
     void 실패한_건_위에는_다시_요청할_수_있다() {
         givenCards(1);
-        instagramClient.failAt(MockInstagramClient.Step.PUBLISH);
+        instagramClient.failAt(MockInstagramClient.Step.PUBLISH, PublishFailure.TOKEN_EXPIRED);
         assertThat(publish("캡션").getStatus()).isEqualTo(PublishStatus.FAILED);
 
         instagramClient.reset();
@@ -265,21 +269,22 @@ class InstagramPublishServiceTest {
 
         PublishRecord record = publish("캡션");
 
-        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
-        assertThat(record.getErrorMessage()).contains("폴링");
+        // 원인을 모르는 실패이므로 포기하지 않고 재예약한다
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.UNKNOWN);
         assertThat(callCount("getContainerStatus")).isEqualTo(MAX_POLL_COUNT);
         assertThat(callCount("publishContainer")).isZero();
     }
 
     @Test
-    void 컨테이너가_만료되면_즉시_실패로_기록한다() {
+    void 컨테이너가_만료되면_폴링을_멈추고_재시도로_넘긴다() {
         givenCards(1);
         instagramClient.failAt(MockInstagramClient.Step.STATUS_EXPIRED);
 
         PublishRecord record = publish("캡션");
 
-        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
-        assertThat(record.getErrorMessage()).contains("EXPIRED");
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.CONTAINER_EXPIRED);
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
         assertThat(callCount("getContainerStatus")).isEqualTo(1);
     }
 
@@ -288,7 +293,7 @@ class InstagramPublishServiceTest {
         givenCards(1);
         instagramClient.failAt(MockInstagramClient.Step.STATUS_ERROR);
 
-        assertThat(publish("캡션").getErrorMessage()).contains("ERROR");
+        assertThat(publish("캡션").getFailureType()).isEqualTo(PublishFailure.CONTAINER_ERROR);
     }
 
     /**
@@ -296,9 +301,9 @@ class InstagramPublishServiceTest {
      * 재시도(VAN-13)가 기댈 근거가 이 행이므로 예외 대신 FAILED로 남긴다.
      */
     @Test
-    void 발행_단계_실패는_예외_대신_FAILED로_기록한다() {
+    void 발행_단계_실패는_예외_대신_기록으로_남는다() {
         givenCards(2);
-        instagramClient.failAt(MockInstagramClient.Step.PUBLISH);
+        instagramClient.failAt(MockInstagramClient.Step.PUBLISH, PublishFailure.TOKEN_EXPIRED);
 
         PublishRecord record = publish("캡션");
 
@@ -313,8 +318,9 @@ class InstagramPublishServiceTest {
 
         PublishRecord record = publish("캡션");
 
+        // 콘텐츠가 그대로인 한 다시 올려도 같은 결과라 재시도하지 않는다
         assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
-        assertThat(record.getErrorMessage()).contains("최대 10장");
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.INVALID_CARDS);
         assertThat(instagramClient.calls()).isEmpty();
     }
 
@@ -323,6 +329,106 @@ class InstagramPublishServiceTest {
         assertThatThrownBy(() -> service.execute(RECORD_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.PUBLISH_RECORD_NOT_FOUND.getDefaultMessage());
+    }
+
+    // ------------------------------------------------------------------
+    // 실패 원인별 처리 (VAN-13)
+    //
+    // 이 네 가지 실패는 실 API로도 재현할 수 없다 — 컨테이너를 24시간 묵히거나, 하루 100건을 올리거나,
+    // 토큰을 일부러 만료시킬 수 없다. Mock의 실패 주입이 유일한 검증 수단이고 전환 후에도 그렇다.
+    // ------------------------------------------------------------------
+
+    @Test
+    void 토큰_만료는_재시도하지_않고_재인증을_요구하는_메시지로_멈춘다() {
+        givenCards(1);
+        instagramClient.failAt(MockInstagramClient.Step.CREATE_ITEM, PublishFailure.TOKEN_EXPIRED);
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
+        assertThat(record.getRetryCount()).isZero();
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.TOKEN_EXPIRED);
+        assertThat(record.getErrorMessage()).contains("재인증");
+    }
+
+    /** 발행 도중이 아니라 자격 조회 단계에서 걸린 만료도 같은 유형으로 모아야 한다. */
+    @Test
+    void 자격_조회_단계의_토큰_만료도_같은_유형으로_분류한다() {
+        givenCards(1);
+        when(tokenService.current()).thenThrow(new CustomException(ErrorCode.INSTAGRAM_TOKEN_NOT_FOUND));
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.TOKEN_EXPIRED);
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    @Test
+    void 레이트리밋은_즉시_재시도하지_않고_쿼터_회복까지_기다린다() {
+        givenCards(1);
+        instagramClient.failAt(MockInstagramClient.Step.PUBLISH, PublishFailure.RATE_LIMITED);
+        LocalDateTime before = KoreaTime.now();
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+        assertThat(record.getRetryCount()).isEqualTo(1);
+        assertThat(record.getScheduledAt())
+                .isAfterOrEqualTo(before.plus(PublishFailure.RATE_LIMITED.getRetryDelay()));
+    }
+
+    @Test
+    void 이미지를_가져가지_못하면_원인_확인_전까지_재시도하지_않는다() {
+        givenCards(1);
+        instagramClient.failAt(MockInstagramClient.Step.CREATE_ITEM, PublishFailure.IMAGE_UNREACHABLE);
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
+        assertThat(record.getRetryCount()).isZero();
+        assertThat(record.getErrorMessage()).contains("저장소");
+    }
+
+    /** 만료된 컨테이너는 되살릴 수 없다. 재시도는 자식 컨테이너부터 새로 만들어야 한다. */
+    @Test
+    void 컨테이너_만료로_재시도할_때_만료된_컨테이너를_재사용하지_않는다() {
+        givenCards(2);
+        instagramClient.failAt(MockInstagramClient.Step.STATUS_EXPIRED);
+        publish("캡션");
+
+        String expiredContainer = instagramClient.calls().stream()
+                .filter(call -> call.startsWith("getContainerStatus:"))
+                .findFirst()
+                .orElseThrow()
+                .substring("getContainerStatus:".length());
+
+        instagramClient.reset();
+        service.execute(RECORD_ID);
+
+        assertThat(callCount("createCarouselItem")).isEqualTo(2);
+        assertThat(callCount("createCarouselContainer")).isEqualTo(1);
+        assertThat(instagramClient.calls()).noneMatch(call -> call.endsWith(expiredContainer));
+    }
+
+    @Test
+    void 재시도_상한을_넘기면_더_이상_재예약하지_않는다() {
+        givenCards(1);
+        instagramClient.failAt(MockInstagramClient.Step.STATUS_ERROR);
+
+        PublishRecord record = publish("캡션");
+
+        for (int attempt = 1; attempt < MAX_RETRY_COUNT; attempt++) {
+            assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+            service.execute(RECORD_ID);
+        }
+
+        assertThat(record.getRetryCount()).isEqualTo(MAX_RETRY_COUNT);
+
+        service.execute(RECORD_ID);
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.FAILED);
+        assertThat(record.getRetryCount()).isEqualTo(MAX_RETRY_COUNT);
     }
 
     // ------------------------------------------------------------------

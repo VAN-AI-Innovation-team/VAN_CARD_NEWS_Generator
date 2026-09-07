@@ -141,7 +141,7 @@ public class InstagramClientImpl implements InstagramClient {
         }
 
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(step + " 응답 실패 (HTTP " + response.statusCode() + ")");
+            throw metaError(response, step);
         }
 
         try {
@@ -149,6 +149,29 @@ public class InstagramClientImpl implements InstagramClient {
         } catch (Exception e) {
             throw new IllegalStateException(step + " 응답 해석 실패: " + e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Meta의 오류 응답을 원인 분류가 실린 예외로 옮깁니다.
+     *
+     * 오류 본문에는 액세스 토큰이 실리지 않으므로 코드만 읽어도 안전합니다. 반대로 본문 전체를 로그에 남기면
+     * 다른 필드를 통해 계정 정보가 새므로, 남기는 것은 단계와 코드뿐입니다.
+     */
+    private InstagramPublishException metaError(HttpResponse<String> response, String step) {
+        int code = 0;
+        int subcode = 0;
+
+        try {
+            JsonNode error = objectMapper.readTree(response.body()).path("error");
+            code = error.path("code").asInt();
+            subcode = error.path("error_subcode").asInt();
+        } catch (Exception e) {
+            // 본문이 JSON이 아니면 코드 없이 UNKNOWN(재시도 대상)으로 떨어진다
+        }
+
+        return new InstagramPublishException(
+                PublishFailure.ofMetaError(code, subcode),
+                step + " 응답 실패 (HTTP " + response.statusCode() + ", code " + code + "/" + subcode + ")");
     }
 
     private String requiredText(JsonNode body, String field, String step) {
