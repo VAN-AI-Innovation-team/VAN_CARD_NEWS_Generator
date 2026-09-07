@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -57,6 +58,7 @@ class InstagramPublishServiceTest {
     private ApprovalStatus approvalStatus;
     private MockInstagramClient instagramClient;
     private InstagramTokenService tokenService;
+    private PublishPreflightValidator preflightValidator;
     private InstagramPublishService service;
 
     @BeforeEach
@@ -106,13 +108,18 @@ class InstagramPublishServiceTest {
         lenient().when(tokenService.current())
                 .thenReturn(new InstagramCredentials("dev-ig-user", "dev-dummy-ig-long-lived-token"));
 
+        // 규격 규칙 자체는 PublishPreflightValidatorTest가 본다. 여기서 보는 것은 호출 순서다 —
+        // 검증이 저장·Meta 호출보다 먼저인가.
+        preflightValidator = mock(PublishPreflightValidator.class);
+
         service = new InstagramPublishService(
                 contentRepository,
                 approvalRequestRepository,
                 cardImageRepository,
                 publishRecordRepository,
                 tokenService,
-                instagramClient);
+                instagramClient,
+                preflightValidator);
 
         ReflectionTestUtils.setField(service, "pollIntervalMs", 1L);
         ReflectionTestUtils.setField(service, "maxPollCount", MAX_POLL_COUNT);
@@ -182,6 +189,21 @@ class InstagramPublishServiceTest {
     }
 
     @Test
+    void 사전_검증에_걸리면_큐에_넣지_않고_Meta도_부르지_않는다() {
+        givenCards(11);
+        doThrow(new CustomException(ErrorCode.INVALID_CARD_COUNT))
+                .when(preflightValidator).validate(any(), any());
+
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+                .isInstanceOf(CustomException.class)
+                .hasMessage(ErrorCode.INVALID_CARD_COUNT.getDefaultMessage());
+
+        // 큐에 들어갔다면 워커가 한도를 깎아 가며 재시도한다. 등록 자체가 없어야 한다.
+        assertThat(savedRecords).isEmpty();
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    @Test
     void 이미_발행에_성공했으면_409로_거절한다() {
         givenCards(1);
         publish("캡션");
@@ -243,6 +265,7 @@ class InstagramPublishServiceTest {
         publish("캡션");
 
         assertThat(instagramClient.calls()).containsExactly(
+                "remainingQuota",
                 "createCarouselItem:https://example.com/card-0.jpg",
                 "createCarouselItem:https://example.com/card-1.jpg",
                 "createCarouselContainer:2|caption",
@@ -250,6 +273,22 @@ class InstagramPublishServiceTest {
                 "getContainerStatus:mock-carousel-3",
                 "publishContainer:mock-carousel-3",
                 "getPermalink:mock-media-4");
+    }
+
+    /**
+     * 쿼터는 등록 시점이 아니라 여기서 본다 — 24시간 이동 윈도우라 예약 등록 시점의 값이 발행 시점을 대변하지 못한다.
+     * 소진 상태에서 컨테이너를 만들면 한도만 더 깎으므로 첫 호출에서 멈춰야 한다.
+     */
+    @Test
+    void 쿼터가_소진되면_컨테이너를_만들지_않고_재시도로_돌린다() {
+        givenCards(3);
+        instagramClient.setRemainingQuota(0);
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+        assertThat(record.getFailureType()).isEqualTo(PublishFailure.RATE_LIMITED);
+        assertThat(instagramClient.calls()).containsExactly("remainingQuota");
     }
 
     /** 폴링 루프가 dev에서도 실제로 도는지 — IN_PROGRESS 한 번을 거쳐 FINISHED에 닿아야 한다. */

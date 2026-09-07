@@ -32,6 +32,14 @@ public interface InstagramClient {
     String getPermalink(InstagramCredentials credentials, String igMediaId);
 
     /**
+     * 24시간 이동 윈도우의 잔여 발행 건수입니다.
+     *
+     * 소진된 상태에서 컨테이너를 만들면 한도만 더 깎고 실패하므로, 발행 직전에 이 값으로 먼저 막습니다.
+     * 한도를 알 수 없는 응답은 {@link Integer#MAX_VALUE}로 돌려줍니다 — 모른다는 이유로 발행을 막지는 않습니다.
+     */
+    int remainingQuota(InstagramCredentials credentials);
+
+    /**
      * 컨테이너 처리 상태입니다. Meta의 {@code status_code} 값과 같습니다.
      */
     enum ContainerStatus {

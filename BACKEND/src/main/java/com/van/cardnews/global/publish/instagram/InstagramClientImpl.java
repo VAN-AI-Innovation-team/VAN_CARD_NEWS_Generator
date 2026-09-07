@@ -110,6 +110,24 @@ public class InstagramClientImpl implements InstagramClient {
                 "permalink 조회");
     }
 
+    @Override
+    public int remainingQuota(InstagramCredentials credentials) {
+        JsonNode data = get(credentials,
+                "/" + credentials.igUserId() + "/content_publishing_limit",
+                "fields=config,quota_usage",
+                "발행 쿼터 조회")
+                .path("data").path(0);
+
+        int total = data.path("config").path("quota_total").asInt();
+
+        // 한도를 못 읽었다면 소진 여부를 판단할 근거가 없다. 모른다는 이유로 발행을 막지는 않는다.
+        if (total <= 0) {
+            return Integer.MAX_VALUE;
+        }
+
+        return Math.max(0, total - data.path("quota_usage").asInt());
+    }
+
     private JsonNode post(InstagramCredentials credentials, String path, String query, String step) {
         return send(
                 HttpRequest.newBuilder(uri(credentials, path, query))

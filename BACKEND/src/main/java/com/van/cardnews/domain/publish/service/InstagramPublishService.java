@@ -53,6 +53,7 @@ public class InstagramPublishService {
     private final PublishRecordRepository publishRecordRepository;
     private final InstagramTokenService instagramTokenService;
     private final InstagramClient instagramClient;
+    private final PublishPreflightValidator preflightValidator;
 
     /** Meta 권장치. Higgsfield의 2초 간격을 복사하면 과호출이 된다. */
     @Value("${app.publish.instagram.poll-interval-ms}")
@@ -124,7 +125,16 @@ public class InstagramPublishService {
 
         validateApproved(contentId);
         validateNotPublishedYet(contentId);
-        validateCardImagesReady(contentId);
+
+        List<GeneratedCardImage> cards =
+                generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
+
+        if (cards.isEmpty()) {
+            throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
+        }
+
+        // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
+        preflightValidator.validate(cards, caption);
 
         return publishRecordRepository.save(
                 PublishRecord.schedule(content, CHANNEL, caption, scheduledAt));
@@ -240,12 +250,6 @@ public class InstagramPublishService {
         }
     }
 
-    private void validateCardImagesReady(Long contentId) {
-        if (generatedCardImageRepository.countByContent_Id(contentId) == 0) {
-            throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
-        }
-    }
-
     private void publishCarousel(PublishRecord record, Long contentId, String caption) {
         List<GeneratedCardImage> cards =
                 generatedCardImageRepository.findByContent_IdOrderBySortOrderAsc(contentId);
@@ -261,6 +265,13 @@ public class InstagramPublishService {
         }
 
         InstagramCredentials credentials = instagramTokenService.current();
+
+        // 소진된 상태에서 컨테이너를 만들면 한도만 더 깎고 실패한다. 등록 시점이 아니라 여기서 보는 이유는
+        // 한도가 24시간 이동 윈도우라, 예약 등록 시점의 값이 발행 시점을 대변하지 못하기 때문이다.
+        if (instagramClient.remainingQuota(credentials) <= 0) {
+            throw new InstagramPublishException(
+                    PublishFailure.RATE_LIMITED, "24시간 발행 한도가 남아 있지 않습니다.");
+        }
 
         List<String> childIds = new ArrayList<>();
         for (GeneratedCardImage card : cards) {
