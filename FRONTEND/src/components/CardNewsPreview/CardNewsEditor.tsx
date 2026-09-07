@@ -86,6 +86,15 @@ function cloneResultWithPlacements(
   return next;
 }
 
+/**
+ * 총 카드 수 상한. 인스타그램 캐러셀 제약이며, 백엔드
+ * `InstagramClient.MAX_CAROUSEL_ITEMS`와 같은 값이다(언어가 달라 공유 불가).
+ */
+const MAX_CARDS = 10;
+
+/** 본문 카드 하한. 백엔드 `CardGenerationValidator`가 빈 content 배열을 거부한다. */
+const MIN_CONTENT_CARDS = 1;
+
 function createEmptyContentCard(): CardGenerationResult['content'][number] {
   return {
     title: '새 카드 제목',
@@ -367,6 +376,10 @@ export default function CardNewsEditor({
   }
 
   function addContentCard() {
+    if (cardCount >= MAX_CARDS) {
+      return;
+    }
+
     setResult((current) => {
       if (!current) {
         return current;
@@ -386,7 +399,8 @@ export default function CardNewsEditor({
     if (
       !result ||
       selectedCardIndex === 0 ||
-      selectedCardIndex > result.content.length
+      selectedCardIndex > result.content.length ||
+      result.content.length <= MIN_CONTENT_CARDS
     ) {
       return;
     }
@@ -671,9 +685,16 @@ export default function CardNewsEditor({
           type="button"
           className="card-news-editor__add-card"
           onClick={addContentCard}
+          disabled={cardCount >= MAX_CARDS}
         >
           + 카드 추가
         </button>
+
+        {cardCount >= MAX_CARDS && (
+          <span className="card-news-editor__card-limit">
+            인스타그램 캐러셀은 최대 {MAX_CARDS}장까지 게시할 수 있습니다.
+          </span>
+        )}
       </div>
 
       <div className="card-news-editor__workspace">
@@ -739,6 +760,7 @@ export default function CardNewsEditor({
                     type="button"
                     className="card-news-editor__delete"
                     onClick={deleteSelectedContentCard}
+                    disabled={result.content.length <= MIN_CONTENT_CARDS}
                   >
                     카드 삭제
                   </button>
