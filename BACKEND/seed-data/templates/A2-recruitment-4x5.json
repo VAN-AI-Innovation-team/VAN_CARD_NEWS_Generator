@@ -1,0 +1,302 @@
+{
+  "name": "모집 카드뉴스 - 직사각형(4:5)",
+  "contentType": "recruitment",
+  "canvasWidth": 1080,
+  "canvasHeight": 1350,
+  "layoutDefinition": {
+    "type": "image-panel-bottom",
+    "description": "세로형 사진과 하단 아이보리 패널을 결합한 카드 구조로, 얇은 포인트 룰로 사진과 텍스트 영역의 경계를 정리했습니다.",
+    "cards": {
+      "cover": {
+        "type": "image-panel-bottom",
+        "description": "템플릿별 대표 표지. 핵심 제목과 콘텐츠 성격을 빠르게 전달하며, 본문 설명은 content 카드에서 전달합니다.",
+        "elements": {
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 58,
+            "cropRatio": "4:3",
+            "layer": 1
+          },
+          "panel": {
+            "role": "panel",
+            "x": 0,
+            "y": 58,
+            "width": 100,
+            "height": 42,
+            "colorToken": "surface",
+            "layer": 2
+          },
+          "rule": {
+            "role": "divider",
+            "x": 7,
+            "y": 62,
+            "width": 9,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
+          },
+          "eyebrow": {
+            "role": "eyebrow",
+            "x": 7,
+            "y": 65,
+            "width": 86,
+            "height": 4.5,
+            "text": "MEMBER RECRUITMENT",
+            "colorToken": "primary",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "title": {
+            "role": "title",
+            "x": 7,
+            "y": 71,
+            "width": 86,
+            "height": 14,
+            "maxChars": 26,
+            "align": "left",
+            "colorToken": "textPrimary",
+            "typographyToken": "title",
+            "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 94,
+            "width": 46,
+            "height": 5,
+            "maxChars": 18,
+            "align": "center",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
+          }
+        }
+      },
+      "content": {
+        "type": "image-highlight-body",
+        "description": "모집형 본문 반복 카드. 사진과 아이보리 패널을 결합하고, 얇은 포인트 룰과 필(pill) 형태 강조 배지로 절제된 위계를 만듭니다.",
+        "elements": {
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 46,
+            "cropRatio": "4:3",
+            "layer": 1
+          },
+          "panel": {
+            "role": "panel",
+            "x": 0,
+            "y": 46,
+            "width": 100,
+            "height": 54,
+            "colorToken": "surface",
+            "layer": 2
+          },
+          "rule": {
+            "role": "divider",
+            "x": 7,
+            "y": 50,
+            "width": 10,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
+          },
+          "sectionLabel": {
+            "role": "eyebrow",
+            "x": 7,
+            "y": 53,
+            "width": 60,
+            "height": 5,
+            "text": "MEMBER RECRUITMENT",
+            "maxChars": 22,
+            "align": "left",
+            "colorToken": "primary",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "title": {
+            "role": "title",
+            "x": 7,
+            "y": 60,
+            "width": 86,
+            "height": 15,
+            "maxChars": 28,
+            "align": "left",
+            "colorToken": "textPrimary",
+            "typographyToken": "title",
+            "layer": 3
+          },
+          "body": {
+            "role": "body",
+            "x": 7,
+            "y": 77,
+            "width": 86,
+            "height": 14,
+            "maxChars": 100,
+            "align": "left",
+            "colorToken": "textSecondary",
+            "typographyToken": "body",
+            "layer": 3
+          },
+          "highlight": {
+            "role": "highlight",
+            "x": 7,
+            "y": 94,
+            "width": 48,
+            "height": 5,
+            "maxChars": 18,
+            "align": "center",
+            "shape": "pill",
+            "colorToken": "textOnDark",
+            "backgroundToken": "primary",
+            "typographyToken": "highlight",
+            "layer": 3,
+            "contentField": "highlight"
+          }
+        }
+      },
+      "closing": {
+        "type": "brand-closing",
+        "description": "모집형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "brand": {
+            "role": "eyebrow",
+            "x": 10,
+            "y": 28,
+            "width": 80,
+            "height": 6,
+            "text": "VAN",
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "cta": {
+            "role": "title",
+            "x": 10,
+            "y": 39,
+            "width": 80,
+            "height": 16,
+            "maxChars": 20,
+            "align": "center",
+            "text": "지금 지원하기",
+            "colorToken": "textOnDark",
+            "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
+            "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
+          }
+        }
+      }
+    }
+  },
+  "designTokens": {
+    "colors": {
+      "background": "#ffffff",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
+      "textOnDark": "#ffffff",
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
+    },
+    "typography": {
+      "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
+      "eyebrowSize": "24px",
+      "eyebrowWeight": "700",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
+      "titleWeight": "800",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
+      "bodyWeight": "400",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
+      "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
+      "footerSize": "22px",
+      "footerWeight": "500",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
+      "quoteMarkWeight": "800",
+      "quoteSize": "46px",
+      "quoteWeight": "700",
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
+    }
+  }
+}

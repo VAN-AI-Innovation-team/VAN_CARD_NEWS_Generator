@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://van-card-news-backend-571061095487.asia-northeast3.run.app/api/:path*"
+    }
+  ]
+}

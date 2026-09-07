@@ -1,0 +1,224 @@
+.tpl-selector {
+  width: 100%;
+}
+
+/* =========================================
+   Selected Content Type
+========================================= */
+
+.tpl-selector__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 9px 14px;
+  border: 1px solid #d7e0ea;
+  border-radius: 6px;
+  background: #f6f8fb;
+}
+
+.tpl-selector__type-label {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tpl-selector__type strong {
+  color: #17365d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* =========================================
+   Template Grid
+========================================= */
+
+.tpl-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* =========================================
+   Template Card
+========================================= */
+
+.tpl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 260px;
+  padding: 24px;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172b4d;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tpl-card:hover {
+  border-color: #54779d;
+  box-shadow: 0 8px 24px rgba(23, 43, 77, 0.08);
+  transform: translateY(-2px);
+}
+
+.tpl-card:focus-visible {
+  outline: 3px solid rgba(39, 76, 119, 0.2);
+  outline-offset: 2px;
+}
+
+.tpl-card--recommended {
+  border-color: #9fb4c9;
+  background: #fbfcfe;
+}
+
+.tpl-card--selected {
+  border-color: #17365d;
+  box-shadow:
+    inset 0 0 0 1px #17365d,
+    0 8px 24px rgba(23, 54, 93, 0.12);
+}
+
+.tpl-card--selected:hover {
+  border-color: #17365d;
+}
+
+/* =========================================
+   Card Top
+========================================= */
+
+.tpl-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+/* =========================================
+   Recommendation Badge
+========================================= */
+
+.tpl-card__recommend {
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: #e9f0f7;
+  color: #274c77;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* =========================================
+   Card Text
+========================================= */
+
+.tpl-card__tag {
+  margin-bottom: 6px;
+  color: #6b7f95;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.tpl-card__label {
+  margin-bottom: 22px;
+  color: #172b4d;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tpl-card__row {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #edf0f3;
+}
+
+.tpl-card__row-label {
+  flex: 0 0 64px;
+  color: #7a8797;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tpl-card__row-value {
+  color: #4f5d6b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Selected State
+========================================= */
+
+.tpl-card__selected {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: #17365d;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* =========================================
+   Empty / Loading / Error
+========================================= */
+
+.tpl-selector__empty {
+  padding: 48px 24px;
+
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+
+  background: #f9fafc;
+
+  text-align: center;
+}
+
+.tpl-selector__empty-title {
+  margin: 0;
+
+  color: #27364d;
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tpl-selector__empty-description {
+  margin: 8px 0 0;
+
+  color: #7a8797;
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   Responsive
+========================================= */
+
+@media (max-width: 768px) {
+  .tpl-selector__title {
+    font-size: 21px;
+  }
+
+  .tpl-selector__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tpl-card {
+    min-height: auto;
+  }
+}

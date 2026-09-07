@@ -1,3 +1,10 @@
+# Secrets
+.env
+.env.*
+!.env.example
+**/secrets/
+/*.secret
+
 # Compiled class file
 *.class
 
@@ -10,7 +17,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -19,11 +26,37 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Java Virtual Machine crash logs
 hs_err_pid*
 replay_pid*
 
 # Node / Frontend
-node_modules/
-dist/
-.env
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+FRONTEND/node_modules/
+FRONTEND/dist/
+FRONTEND/.env
+
+# Java / Spring Backend
+backend/build/
+backend/.gradle/
+backend/out/
+backend/.idea/
+backend/.env
+BACKEND/build/
+BACKEND/.gradle/
+BACKEND/out/
+BACKEND/.idea/
+BACKEND/.env
+
+# Build & IDE (Global)
+.gradle/
+build/
+.idea/
+*.iml
+.vscode/
+
+# Common OS files
+.DS_Store
+Thumbs.db

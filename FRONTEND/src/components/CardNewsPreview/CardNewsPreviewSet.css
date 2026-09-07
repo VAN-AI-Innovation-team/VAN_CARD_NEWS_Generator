@@ -1,0 +1,31 @@
+.card-news-preview-set {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 32px;
+  width: 100%;
+}
+
+.card-news-preview-set__item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.card-news-preview-set__number {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #68758a;
+}
+
+@media (max-width: 640px) {
+  .card-news-preview-set {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .card-news-preview-set__item {
+    width: 100%;
+  }
+}

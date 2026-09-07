@@ -1,0 +1,302 @@
+{
+  "name": "인용 카드뉴스 - 직사각형(4:5)",
+  "contentType": "quote",
+  "canvasWidth": 1080,
+  "canvasHeight": 1350,
+  "layoutDefinition": {
+    "type": "quote-center-tall",
+    "description": "세로로 확장된 남색 배경에 대형 따옴표 장식과 중앙 정렬 인용구, 하단 출처가 배치된 텍스트 중심 레이아웃입니다.",
+    "cards": {
+      "cover": {
+        "type": "quote-center-tall",
+        "description": "템플릿별 대표 표지. quoteText는 title 필드, source는 highlight 필드에 바인딩되어 실제 생성된 인용문과 출처가 표시됩니다.",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "quoteMark": {
+            "role": "decoration",
+            "x": 10,
+            "y": 9,
+            "width": 18,
+            "height": 9,
+            "text": "“",
+            "colorToken": "accent",
+            "typographyToken": "quoteMark",
+            "layer": 3
+          },
+          "quoteText": {
+            "role": "title",
+            "x": 10,
+            "y": 21,
+            "width": 80,
+            "height": 48,
+            "maxChars": 90,
+            "align": "center",
+            "colorToken": "textOnDark",
+            "typographyToken": "quote",
+            "layer": 3
+          },
+          "rule": {
+            "role": "divider",
+            "x": 40,
+            "y": 73,
+            "width": 20,
+            "height": 0.25,
+            "colorToken": "accent",
+            "layer": 3
+          },
+          "source": {
+            "role": "highlight",
+            "x": 10,
+            "y": 77,
+            "width": 80,
+            "height": 6,
+            "maxChars": 30,
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "footer",
+            "layer": 3,
+            "contentField": "highlight"
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
+          }
+        }
+      },
+      "content": {
+        "type": "quote-center",
+        "description": "인용형 본문 반복 카드. 대형 따옴표 장식과 중앙 정렬 인용문, 얇은 헤어라인 아래 출처를 배치합니다. (source는 highlight 필드에 바인딩되어 실제 생성된 출처 텍스트가 표시됩니다.)",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "quoteMark": {
+            "role": "decoration",
+            "x": 10,
+            "y": 9,
+            "width": 18,
+            "height": 10,
+            "text": "“",
+            "colorToken": "accent",
+            "typographyToken": "quoteMark",
+            "layer": 3
+          },
+          "quoteText": {
+            "role": "body",
+            "x": 10,
+            "y": 22,
+            "width": 80,
+            "height": 50,
+            "maxChars": 110,
+            "align": "center",
+            "colorToken": "textOnDark",
+            "typographyToken": "quote",
+            "layer": 3
+          },
+          "rule": {
+            "role": "divider",
+            "x": 40,
+            "y": 75,
+            "width": 20,
+            "height": 0.3,
+            "colorToken": "accent",
+            "layer": 3
+          },
+          "source": {
+            "role": "highlight",
+            "x": 10,
+            "y": 79,
+            "width": 80,
+            "height": 7,
+            "maxChars": 30,
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "footer",
+            "layer": 3,
+            "contentField": "highlight"
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
+          }
+        }
+      },
+      "closing": {
+        "type": "brand-closing",
+        "description": "인용형 브랜드 마무리 카드. 남색 배경에 상하 헤어라인과 태그라인을 더해 마무리감을 보강한 구조입니다. 이미지와 남색 반투명 오버레이를 함께 사용하며 CTA는 카드 데이터에 바인딩됩니다.",
+        "elements": {
+          "background": {
+            "role": "background",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "primaryDark",
+            "layer": 0
+          },
+          "topRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 24,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "brand": {
+            "role": "eyebrow",
+            "x": 10,
+            "y": 28,
+            "width": 80,
+            "height": 6,
+            "text": "VAN",
+            "align": "center",
+            "colorToken": "accent",
+            "typographyToken": "eyebrow",
+            "layer": 3
+          },
+          "cta": {
+            "role": "title",
+            "x": 10,
+            "y": 39,
+            "width": 80,
+            "height": 16,
+            "maxChars": 20,
+            "align": "center",
+            "text": "VAN과 함께하기",
+            "colorToken": "textOnDark",
+            "typographyToken": "title",
+            "layer": 3,
+            "contentField": "cta"
+          },
+          "tagline": {
+            "role": "footer",
+            "x": 10,
+            "y": 59,
+            "width": 80,
+            "height": 6,
+            "maxChars": 24,
+            "align": "center",
+            "text": "대학 학회 · 학술 총연합체",
+            "colorToken": "textOnDarkMuted",
+            "typographyToken": "footer",
+            "layer": 3
+          },
+          "bottomRule": {
+            "role": "divider",
+            "x": 44,
+            "y": 69,
+            "width": 12,
+            "height": 0.35,
+            "colorToken": "accent",
+            "layer": 2
+          },
+          "image": {
+            "role": "image",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "cropRatio": "1080:1350",
+            "layer": 1
+          },
+          "overlay": {
+            "role": "overlay",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "colorToken": "overlay",
+            "layer": 2
+          }
+        }
+      }
+    }
+  },
+  "designTokens": {
+    "colors": {
+      "background": "#ffffff",
+      "surface": "#f7f5f0",
+      "primary": "#15335f",
+      "primaryDark": "#0b1f3a",
+      "accent": "#5678a3",
+      "accentLine": "#aebccf",
+      "border": "#e3e0d8",
+      "textPrimary": "#161c26",
+      "textSecondary": "#5c6472",
+      "textOnDark": "#ffffff",
+      "textOnDarkMuted": "rgba(255,255,255,0.72)",
+      "overlay": "rgba(9,26,50,0.78)"
+    },
+    "typography": {
+      "fontFamily": "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
+      "eyebrowSize": "24px",
+      "eyebrowWeight": "700",
+      "eyebrowLetterSpacing": "3.5px",
+      "badgeSize": "22px",
+      "badgeWeight": "700",
+      "badgeLetterSpacing": "0.5px",
+      "titleSize": "58px",
+      "titleWeight": "800",
+      "titleLineHeight": "1.28",
+      "titleLetterSpacing": "-0.5px",
+      "bodySize": "30px",
+      "bodyWeight": "400",
+      "bodyLineHeight": "1.75",
+      "highlightSize": "26px",
+      "highlightWeight": "700",
+      "highlightLetterSpacing": "0.3px",
+      "footerSize": "22px",
+      "footerWeight": "500",
+      "footerLetterSpacing": "0.3px",
+      "quoteMarkSize": "150px",
+      "quoteMarkWeight": "800",
+      "quoteSize": "46px",
+      "quoteWeight": "700",
+      "quoteLineHeight": "1.55",
+      "quoteLetterSpacing": "-0.3px"
+    }
+  }
+}
