@@ -2,11 +2,15 @@ package com.van.cardnews.domain.publish.service;
 
 import com.van.cardnews.domain.approval.entity.ApprovalStatus;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.instagram.service.InstagramTokenService;
+import com.van.cardnews.domain.jobhistory.entity.JobType;
+import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
@@ -54,6 +58,8 @@ public class InstagramPublishService {
     private final InstagramTokenService instagramTokenService;
     private final InstagramClient instagramClient;
     private final PublishPreflightValidator preflightValidator;
+    private final AuditLogService auditLogService;
+    private final JobHistoryService jobHistoryService;
 
     /** Meta 권장치. Higgsfield의 2초 간격을 복사하면 과호출이 된다. */
     @Value("${app.publish.instagram.poll-interval-ms}")
@@ -81,8 +87,8 @@ public class InstagramPublishService {
      * 돌릴 수 없고, 경로를 하나로 두어야 검증·이력·재시도가 갈라지지 않습니다.
      */
     @Transactional
-    public PublishRecord enqueue(Long contentId, String caption) {
-        return enqueueAt(contentId, caption, KoreaTime.now());
+    public PublishRecord enqueue(Long contentId, String caption, String actorId) {
+        return enqueueAt(contentId, caption, KoreaTime.now(), actorId);
     }
 
     /**
@@ -94,10 +100,11 @@ public class InstagramPublishService {
      * 캡션은 이 시점의 값으로 고정 보관합니다. 예약 후 발행 전에 콘텐츠가 수정돼도 의도한 문구가 나갑니다.
      */
     @Transactional
-    public PublishRecord schedule(Long contentId, String caption, LocalDateTime scheduledAt) {
+    public PublishRecord schedule(
+            Long contentId, String caption, LocalDateTime scheduledAt, String actorId) {
         validateScheduledAt(scheduledAt);
 
-        return enqueueAt(contentId, caption, scheduledAt);
+        return enqueueAt(contentId, caption, scheduledAt, actorId);
     }
 
     /**
@@ -119,7 +126,8 @@ public class InstagramPublishService {
         return record;
     }
 
-    private PublishRecord enqueueAt(Long contentId, String caption, LocalDateTime scheduledAt) {
+    private PublishRecord enqueueAt(
+            Long contentId, String caption, LocalDateTime scheduledAt, String actorId) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
 
@@ -136,8 +144,17 @@ public class InstagramPublishService {
         // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
         preflightValidator.validate(cards, caption);
 
-        return publishRecordRepository.save(
+        PublishRecord record = publishRecordRepository.save(
                 PublishRecord.schedule(content, CHANNEL, caption, scheduledAt));
+
+        // 감사로그는 요청 시점에 남긴다. 실제 발행은 워커가 하므로 그때는 행위자를 알 수 없다.
+        auditLogService.record(
+                actorId,
+                AuditAction.PUBLISH,
+                contentId,
+                "인스타그램 발행 요청 — 예약 시각 " + scheduledAt);
+
+        return record;
     }
 
     /** 과거 시각과 최소 리드타임 미달은 같은 조건으로 걸린다. */
@@ -285,7 +302,14 @@ public class InstagramPublishService {
         awaitFinished(credentials, containerId);
 
         String igMediaId = instagramClient.publishContainer(credentials, containerId);
-        record.markSuccess(igMediaId, instagramClient.getPermalink(credentials, igMediaId));
+        String permalink = instagramClient.getPermalink(credentials, igMediaId);
+        record.markSuccess(igMediaId, permalink);
+
+        // 성공 건만 작업이력에 남긴다. 실패까지 남기면 ContentService가 최신 작업 이력의 상태를
+        // 콘텐츠 생성 상태로 내려보내므로(resolveGenerationStatus) 화면에 "생성 실패"로 뜨고,
+        // PENDING/PROCESSING 이력은 콘텐츠 수정까지 막는다. 실패 원인은 publish_records에 남는다.
+        jobHistoryService.createJobHistory(record.getContent(), JobType.INSTAGRAM_PUBLISH)
+                .markCompleted(permalink);
 
         // 다운로드는 더 이상 PUBLISHED로 전이시키지 않는다. 실제 외부 발행만 이 상태를 만든다.
         record.getContent().publish();

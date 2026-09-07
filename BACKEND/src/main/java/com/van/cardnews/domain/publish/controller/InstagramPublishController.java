@@ -25,25 +25,28 @@ public class InstagramPublishController {
     @PostMapping
     public ResponseEntity<PublishRecordResponse> publish(
             @PathVariable Long contentId,
-            @RequestBody(required = false) InstagramPublishRequest request
+            @RequestBody(required = false) InstagramPublishRequest request,
+            @RequestHeader(value = "X-Actor-Id", defaultValue = "SYSTEM") String actorId
     ) {
         String caption = request == null ? null : request.caption();
 
         return ResponseEntity
                 .accepted()
-                .body(PublishRecordResponse.from(instagramPublishService.enqueue(contentId, caption)));
+                .body(PublishRecordResponse.from(
+                        instagramPublishService.enqueue(contentId, caption, actorId)));
     }
 
     /** 예약 발행 등록 — 도래 시점에 워커가 집어간다. */
     @PostMapping("/schedule")
     public ResponseEntity<PublishRecordResponse> schedule(
             @PathVariable Long contentId,
-            @RequestBody InstagramScheduleRequest request
+            @RequestBody InstagramScheduleRequest request,
+            @RequestHeader(value = "X-Actor-Id", defaultValue = "SYSTEM") String actorId
     ) {
         return ResponseEntity
                 .accepted()
-                .body(PublishRecordResponse.from(
-                        instagramPublishService.schedule(contentId, request.caption(), request.scheduledAt())));
+                .body(PublishRecordResponse.from(instagramPublishService.schedule(
+                        contentId, request.caption(), request.scheduledAt(), actorId)));
     }
 
     /** 예약 취소 — 워커가 이미 선점한 건은 409. */

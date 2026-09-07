@@ -3,11 +3,17 @@ package com.van.cardnews.domain.publish.service;
 import com.van.cardnews.domain.approval.entity.ApprovalRequest;
 import com.van.cardnews.domain.approval.entity.ApprovalStatus;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.instagram.service.InstagramTokenService;
+import com.van.cardnews.domain.jobhistory.entity.JobHistory;
+import com.van.cardnews.domain.jobhistory.entity.JobStatus;
+import com.van.cardnews.domain.jobhistory.entity.JobType;
+import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
@@ -31,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -46,6 +54,7 @@ import static org.mockito.Mockito.when;
 class InstagramPublishServiceTest {
 
     private static final long CONTENT_ID = 42L;
+    private static final String ACTOR_ID = "hanms";
     private static final long RECORD_ID = 7L;
     private static final int MAX_POLL_COUNT = 3;
     private static final long MIN_LEAD_MINUTES = 5;
@@ -59,6 +68,9 @@ class InstagramPublishServiceTest {
     private MockInstagramClient instagramClient;
     private InstagramTokenService tokenService;
     private PublishPreflightValidator preflightValidator;
+    private AuditLogService auditLogService;
+    private JobHistoryService jobHistoryService;
+    private List<JobHistory> jobHistories;
     private InstagramPublishService service;
 
     @BeforeEach
@@ -112,6 +124,18 @@ class InstagramPublishServiceTest {
         // 검증이 저장·Meta 호출보다 먼저인가.
         preflightValidator = mock(PublishPreflightValidator.class);
 
+        auditLogService = mock(AuditLogService.class);
+
+        jobHistories = new ArrayList<>();
+        jobHistoryService = mock(JobHistoryService.class);
+        lenient().when(jobHistoryService.createJobHistory(any(), any()))
+                .thenAnswer(invocation -> {
+                    JobHistory history = JobHistory.createPending(
+                            invocation.getArgument(0), invocation.getArgument(1));
+                    jobHistories.add(history);
+                    return history;
+                });
+
         service = new InstagramPublishService(
                 contentRepository,
                 approvalRequestRepository,
@@ -119,7 +143,9 @@ class InstagramPublishServiceTest {
                 publishRecordRepository,
                 tokenService,
                 instagramClient,
-                preflightValidator);
+                preflightValidator,
+                auditLogService,
+                jobHistoryService);
 
         ReflectionTestUtils.setField(service, "pollIntervalMs", 1L);
         ReflectionTestUtils.setField(service, "maxPollCount", MAX_POLL_COUNT);
@@ -143,7 +169,7 @@ class InstagramPublishServiceTest {
     }
 
     private PublishRecord publish(String caption) {
-        service.enqueue(CONTENT_ID, caption);
+        service.enqueue(CONTENT_ID, caption, ACTOR_ID);
         return service.execute(RECORD_ID);
     }
 
@@ -159,7 +185,7 @@ class InstagramPublishServiceTest {
     void 승인된_콘텐츠는_예약_상태로_큐에_등록된다() {
         givenCards(3);
 
-        PublishRecord record = service.enqueue(CONTENT_ID, "캡션");
+        PublishRecord record = service.enqueue(CONTENT_ID, "캡션", ACTOR_ID);
 
         assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
         assertThat(record.getScheduledAt()).isNotNull();
@@ -174,7 +200,7 @@ class InstagramPublishServiceTest {
         givenCards(3);
         approvalStatus = ApprovalStatus.PENDING;
 
-        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.CONTENT_NOT_APPROVED_FOR_PUBLISH.getDefaultMessage())
                 // 다운로드용 문구를 재사용하면 "다운로드할 수 있습니다"가 발행 화면에 뜬다
@@ -183,7 +209,7 @@ class InstagramPublishServiceTest {
 
     @Test
     void 카드_이미지가_없으면_큐에_넣지_않는다() {
-        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.CARD_IMAGES_NOT_READY.getDefaultMessage());
     }
@@ -194,7 +220,7 @@ class InstagramPublishServiceTest {
         doThrow(new CustomException(ErrorCode.INVALID_CARD_COUNT))
                 .when(preflightValidator).validate(any(), any());
 
-        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.INVALID_CARD_COUNT.getDefaultMessage());
 
@@ -208,7 +234,7 @@ class InstagramPublishServiceTest {
         givenCards(1);
         publish("캡션");
 
-        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.CONTENT_ALREADY_PUBLISHED.getDefaultMessage());
     }
@@ -216,9 +242,9 @@ class InstagramPublishServiceTest {
     @Test
     void 진행_중인_건이_있으면_409로_거절한다() {
         givenCards(1);
-        service.enqueue(CONTENT_ID, "캡션");
+        service.enqueue(CONTENT_ID, "캡션", ACTOR_ID);
 
-        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(CONTENT_ID, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.PUBLISH_ALREADY_REQUESTED.getDefaultMessage());
     }
@@ -231,12 +257,12 @@ class InstagramPublishServiceTest {
 
         instagramClient.reset();
 
-        assertThat(service.enqueue(CONTENT_ID, "캡션").getStatus()).isEqualTo(PublishStatus.SCHEDULED);
+        assertThat(service.enqueue(CONTENT_ID, "캡션", ACTOR_ID).getStatus()).isEqualTo(PublishStatus.SCHEDULED);
     }
 
     @Test
     void 없는_콘텐츠는_거절한다() {
-        assertThatThrownBy(() -> service.enqueue(999L, "캡션"))
+        assertThatThrownBy(() -> service.enqueue(999L, "캡션", ACTOR_ID))
                 .isInstanceOf(CustomException.class);
     }
 
@@ -479,7 +505,7 @@ class InstagramPublishServiceTest {
         givenCards(3);
         LocalDateTime scheduledAt = KoreaTime.now().plusMinutes(10);
 
-        PublishRecord record = service.schedule(CONTENT_ID, "예약 캡션", scheduledAt);
+        PublishRecord record = service.schedule(CONTENT_ID, "예약 캡션", scheduledAt, ACTOR_ID);
 
         assertThat(record.getStatus()).isEqualTo(PublishStatus.SCHEDULED);
         assertThat(record.getScheduledAt()).isEqualTo(scheduledAt);
@@ -492,7 +518,7 @@ class InstagramPublishServiceTest {
     void 과거_시각_예약은_거절한다() {
         givenCards(3);
 
-        assertThatThrownBy(() -> service.schedule(CONTENT_ID, "캡션", KoreaTime.now().minusMinutes(1)))
+        assertThatThrownBy(() -> service.schedule(CONTENT_ID, "캡션", KoreaTime.now().minusMinutes(1), ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
     }
@@ -502,7 +528,7 @@ class InstagramPublishServiceTest {
         givenCards(3);
 
         assertThatThrownBy(() -> service.schedule(
-                CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(MIN_LEAD_MINUTES - 1)))
+                CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(MIN_LEAD_MINUTES - 1), ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
     }
@@ -512,7 +538,7 @@ class InstagramPublishServiceTest {
         givenCards(3);
 
         assertThatThrownBy(() -> service.schedule(
-                CONTENT_ID, "캡션", KoreaTime.now().plusDays(MAX_HORIZON_DAYS).plusMinutes(1)))
+                CONTENT_ID, "캡션", KoreaTime.now().plusDays(MAX_HORIZON_DAYS).plusMinutes(1), ACTOR_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.INVALID_SCHEDULE_TIME.getDefaultMessage());
     }
@@ -520,17 +546,17 @@ class InstagramPublishServiceTest {
     @Test
     void 예약을_취소하면_CANCELED가_되고_같은_콘텐츠를_다시_예약할_수_있다() {
         givenCards(3);
-        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10));
+        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10), ACTOR_ID);
 
         assertThat(service.cancel(CONTENT_ID).getStatus()).isEqualTo(PublishStatus.CANCELED);
-        assertThat(service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(20)).getStatus())
+        assertThat(service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(20), ACTOR_ID).getStatus())
                 .isEqualTo(PublishStatus.SCHEDULED);
     }
 
     @Test
     void 워커가_선점한_건은_취소할_수_없다() {
         givenCards(3);
-        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10)).markProcessing();
+        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10), ACTOR_ID).markProcessing();
 
         assertThatThrownBy(() -> service.cancel(CONTENT_ID))
                 .isInstanceOf(CustomException.class)
@@ -567,5 +593,57 @@ class InstagramPublishServiceTest {
         assertThatThrownBy(() -> service.latest(CONTENT_ID))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.PUBLISH_RECORD_NOT_FOUND.getDefaultMessage());
+    }
+
+    // ------------------------------------------------------------------
+    // 작업이력·감사로그
+    // ------------------------------------------------------------------
+
+    /** 발행은 워커가 나중에 하므로 행위자를 알 수 있는 시점은 요청 시점뿐이다. */
+    @Test
+    void 발행_요청은_요청한_사람으로_감사로그에_남는다() {
+        givenCards(3);
+
+        service.enqueue(CONTENT_ID, "캡션", ACTOR_ID);
+
+        verify(auditLogService).record(
+                eq(ACTOR_ID), eq(AuditAction.PUBLISH), eq(CONTENT_ID), contains("발행 요청"));
+    }
+
+    @Test
+    void 예약_등록도_감사로그를_남긴다() {
+        givenCards(3);
+
+        service.schedule(CONTENT_ID, "캡션", KoreaTime.now().plusMinutes(10), ACTOR_ID);
+
+        verify(auditLogService).record(
+                eq(ACTOR_ID), eq(AuditAction.PUBLISH), eq(CONTENT_ID), contains("발행 요청"));
+    }
+
+    @Test
+    void 발행에_성공하면_작업이력에_permalink가_남는다() {
+        givenCards(3);
+
+        PublishRecord record = publish("캡션");
+
+        assertThat(jobHistories).hasSize(1);
+        JobHistory history = jobHistories.get(0);
+        assertThat(history.getJobType()).isEqualTo(JobType.INSTAGRAM_PUBLISH);
+        assertThat(history.getStatus()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(history.getResultUrl()).isEqualTo(record.getPermalink());
+    }
+
+    /**
+     * 실패까지 남기면 ContentService.resolveGenerationStatus가 최신 작업 이력의 상태를
+     * 콘텐츠 생성 상태로 내려보내 화면에 "생성 실패"로 뜬다. 실패 원인은 publish_records에 남는다.
+     */
+    @Test
+    void 발행에_실패하면_작업이력을_남기지_않는다() {
+        givenCards(3);
+        instagramClient.setRemainingQuota(0);
+
+        publish("캡션");
+
+        assertThat(jobHistories).isEmpty();
     }
 }

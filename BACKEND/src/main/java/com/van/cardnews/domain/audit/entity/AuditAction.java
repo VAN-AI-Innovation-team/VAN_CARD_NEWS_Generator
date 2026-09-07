@@ -6,5 +6,6 @@ public enum AuditAction {
     APPROVAL_REQUEST,
     APPROVE,
     REJECT,
-    DOWNLOAD
+    DOWNLOAD,
+    PUBLISH
 }
