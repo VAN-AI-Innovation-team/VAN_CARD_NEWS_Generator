@@ -13,12 +13,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,6 +85,52 @@ class InstagramPublishControllerTest {
                 .thenThrow(new CustomException(ErrorCode.CONTENT_ALREADY_PUBLISHED));
 
         mockMvc.perform(post(PATH)).andExpect(status().isConflict());
+    }
+
+    @Test
+    void 예약_등록은_202와_예약_시각을_돌려준다() throws Exception {
+        PublishRecord scheduled = record(null, null);
+        when(instagramPublishService.schedule(anyLong(), any(), any())).thenReturn(scheduled);
+
+        mockMvc.perform(post(PATH + "/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scheduledAt\":\"2099-01-01T09:00:00\",\"caption\":\"캡션\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.scheduledAt").isNotEmpty());
+    }
+
+    @Test
+    void 잘못된_예약_시각은_400으로_거절된다() throws Exception {
+        when(instagramPublishService.schedule(anyLong(), any(), any()))
+                .thenThrow(new CustomException(ErrorCode.INVALID_SCHEDULE_TIME));
+
+        mockMvc.perform(post(PATH + "/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scheduledAt\":\"2000-01-01T09:00:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SCHEDULE_TIME"));
+    }
+
+    @Test
+    void 예약_취소는_CANCELED_상태를_돌려준다() throws Exception {
+        PublishRecord canceled = record(null, null);
+        canceled.cancel();
+        when(instagramPublishService.cancel(anyLong())).thenReturn(canceled);
+
+        mockMvc.perform(delete(PATH + "/schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"));
+    }
+
+    @Test
+    void 선점된_건의_취소는_409로_거절된다() throws Exception {
+        doThrow(new CustomException(ErrorCode.PUBLISH_ALREADY_PROCESSING))
+                .when(instagramPublishService).cancel(anyLong());
+
+        mockMvc.perform(delete(PATH + "/schedule"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PUBLISH_ALREADY_PROCESSING"));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.van.cardnews.domain.publish.controller;
 
 import com.van.cardnews.domain.publish.dto.request.InstagramPublishRequest;
+import com.van.cardnews.domain.publish.dto.request.InstagramScheduleRequest;
 import com.van.cardnews.domain.publish.dto.response.PublishRecordResponse;
 import com.van.cardnews.domain.publish.service.InstagramPublishService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,24 @@ public class InstagramPublishController {
         return ResponseEntity
                 .accepted()
                 .body(PublishRecordResponse.from(instagramPublishService.enqueue(contentId, caption)));
+    }
+
+    /** 예약 발행 등록 — 도래 시점에 워커가 집어간다. */
+    @PostMapping("/schedule")
+    public ResponseEntity<PublishRecordResponse> schedule(
+            @PathVariable Long contentId,
+            @RequestBody InstagramScheduleRequest request
+    ) {
+        return ResponseEntity
+                .accepted()
+                .body(PublishRecordResponse.from(
+                        instagramPublishService.schedule(contentId, request.caption(), request.scheduledAt())));
+    }
+
+    /** 예약 취소 — 워커가 이미 선점한 건은 409. */
+    @DeleteMapping("/schedule")
+    public ResponseEntity<PublishRecordResponse> cancelSchedule(@PathVariable Long contentId) {
+        return ResponseEntity.ok(PublishRecordResponse.from(instagramPublishService.cancel(contentId)));
     }
 
     /** 최신 발행 건의 상태 조회 — 예약·진행·성공·실패를 한 응답으로 본다. */

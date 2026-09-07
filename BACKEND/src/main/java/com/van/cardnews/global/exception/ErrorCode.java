@@ -147,6 +147,16 @@ public enum ErrorCode {
     PUBLISH_RECORD_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "발행 이력을 찾을 수 없습니다."
+    ),
+
+    INVALID_SCHEDULE_TIME(
+            HttpStatus.BAD_REQUEST,
+            "예약 시각이 올바르지 않습니다."
+    ),
+
+    PUBLISH_ALREADY_PROCESSING(
+            HttpStatus.CONFLICT,
+            "발행이 이미 진행 중이라 취소할 수 없습니다."
     );
 
     private final HttpStatus status;

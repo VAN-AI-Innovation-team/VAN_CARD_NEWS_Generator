@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,6 +59,13 @@ public class InstagramPublishService {
     @Value("${app.publish.instagram.max-poll-count}")
     private int maxPollCount;
 
+    /** 예약은 워커 주기보다 넉넉히 앞서야 한다. 주기보다 짧으면 등록되자마자 유예 판정을 받는다. */
+    @Value("${app.publish.schedule.min-lead-minutes}")
+    private long minLeadMinutes;
+
+    @Value("${app.publish.schedule.max-horizon-days}")
+    private long maxHorizonDays;
+
     /**
      * 발행을 큐에 등록합니다. 실제 호출은 워커가 {@link #execute(Long)}로 수행합니다.
      *
@@ -67,6 +75,44 @@ public class InstagramPublishService {
      */
     @Transactional
     public PublishRecord enqueue(Long contentId, String caption) {
+        return enqueueAt(contentId, caption, KoreaTime.now());
+    }
+
+    /**
+     * 지정한 시각으로 예약 등록합니다.
+     *
+     * 컨테이너는 생성 후 24시간에 만료되므로 여기서 미리 만들어 두지 않습니다. 등록되는 것은 큐 한 줄뿐이고,
+     * 자식 컨테이너부터의 모든 호출은 워커가 도래 시점에 수행합니다.
+     *
+     * 캡션은 이 시점의 값으로 고정 보관합니다. 예약 후 발행 전에 콘텐츠가 수정돼도 의도한 문구가 나갑니다.
+     */
+    @Transactional
+    public PublishRecord schedule(Long contentId, String caption, LocalDateTime scheduledAt) {
+        validateScheduledAt(scheduledAt);
+
+        return enqueueAt(contentId, caption, scheduledAt);
+    }
+
+    /**
+     * 발행 전 건을 취소합니다. 워커가 이미 선점한(PROCESSING) 건은 외부 호출이 진행 중이라 되돌릴 수 없습니다.
+     */
+    @Transactional
+    public PublishRecord cancel(Long contentId) {
+        PublishRecord record = latest(contentId);
+
+        if (record.getStatus() == PublishStatus.SUCCESS) {
+            throw new CustomException(ErrorCode.CONTENT_ALREADY_PUBLISHED);
+        }
+        if (record.getStatus() == PublishStatus.PROCESSING) {
+            throw new CustomException(ErrorCode.PUBLISH_ALREADY_PROCESSING);
+        }
+
+        record.cancel();
+
+        return record;
+    }
+
+    private PublishRecord enqueueAt(Long contentId, String caption, LocalDateTime scheduledAt) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
 
@@ -75,7 +121,21 @@ public class InstagramPublishService {
         validateCardImagesReady(contentId);
 
         return publishRecordRepository.save(
-                PublishRecord.schedule(content, CHANNEL, caption, KoreaTime.now()));
+                PublishRecord.schedule(content, CHANNEL, caption, scheduledAt));
+    }
+
+    /** 과거 시각과 최소 리드타임 미달은 같은 조건으로 걸린다. */
+    private void validateScheduledAt(LocalDateTime scheduledAt) {
+        if (scheduledAt == null) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_TIME);
+        }
+
+        LocalDateTime now = KoreaTime.now();
+
+        if (scheduledAt.isBefore(now.plusMinutes(minLeadMinutes))
+                || scheduledAt.isAfter(now.plusDays(maxHorizonDays))) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_TIME);
+        }
     }
 
     /**
