@@ -2,7 +2,7 @@ package com.van.cardnews.global.ai.openai;
 
 import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
-@Profile("dev")
+@ConditionalOnProperty(name = "app.ai.mock", havingValue = "true")
 public class MockOpenAIClient implements OpenAIClient {
 
     /**
