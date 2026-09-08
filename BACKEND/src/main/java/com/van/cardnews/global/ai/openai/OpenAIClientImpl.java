@@ -13,7 +13,7 @@ import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-@Profile("prod")
+@ConditionalOnProperty(name = "app.ai.mock", havingValue = "false")
 public class OpenAIClientImpl implements com.van.cardnews.global.ai.openai.OpenAIClient {
 
     private final OpenAIClient client;

@@ -3,7 +3,7 @@ package com.van.cardnews.global.ai.higgsfield;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.van.cardnews.global.ai.higgsfield.dto.HiggsfieldGenerationRequest;
 import com.van.cardnews.global.ai.higgsfield.dto.HiggsfieldGenerationResult;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Component
-@Profile("dev")
+@ConditionalOnProperty(name = "app.ai.mock", havingValue = "true")
 public class MockHiggsfieldClient implements HiggsfieldClient {
 
     private static final Color FALLBACK_BACKGROUND =
