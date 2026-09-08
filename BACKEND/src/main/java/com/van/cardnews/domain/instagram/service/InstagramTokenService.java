@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.instagram.service;
 
+import com.van.cardnews.domain.instagram.dto.request.InstagramTokenRegisterRequest;
+import com.van.cardnews.domain.instagram.dto.response.InstagramTokenRegisterResponse;
 import com.van.cardnews.domain.instagram.dto.response.TokenRefreshResponse;
 import com.van.cardnews.domain.instagram.entity.InstagramToken;
 import com.van.cardnews.domain.instagram.repository.InstagramTokenRepository;
@@ -29,6 +31,33 @@ public class InstagramTokenService {
     private final InstagramTokenRepository instagramTokenRepository;
     private final InstagramTokenClient instagramTokenClient;
     private final TokenCipher tokenCipher;
+
+    /**
+     * 수동 OAuth로 받아온 장기 토큰을 등록합니다.
+     *
+     * 기존 행을 먼저 전부 지웁니다. {@link #loadToken()}이 그냥 첫 행을 집으므로, 추가만 하면
+     * dev 시더가 심어 둔 더미 행(아직 만료 전이라 유효 판정을 통과한다)이 계속 선택되어
+     * 실 토큰이 무시된 채 Meta가 401을 돌려준다. 그 실패는 토큰 부재가 아니라 인증 오류로
+     * 보이기 때문에 원인을 찾기 어렵다. 팀 계정 1개 고정이라 테이블은 항상 1행이면 된다.
+     */
+    @Transactional
+    public InstagramTokenRegisterResponse register(InstagramTokenRegisterRequest request) {
+        LocalDateTime now = KoreaTime.now();
+
+        instagramTokenRepository.deleteAllInBatch();
+
+        InstagramToken token = instagramTokenRepository.save(InstagramToken.issue(
+                request.igUserId(),
+                tokenCipher.encrypt(request.accessToken()),
+                now,
+                now.plusSeconds(request.expiresInSeconds())));
+
+        // 토큰 값은 남기지 않는다. 등록이 실제로 반영됐는지 확인할 수 있는 최소한만 남긴다.
+        log.info("인스타그램 장기 토큰 등록 — ig_user_id={} 만료 {}", token.getIgUserId(), token.getExpiresAt());
+        warnIfNearingExpiry(token, now);
+
+        return InstagramTokenRegisterResponse.of(token, now);
+    }
 
     /**
      * 발행에 쓸 현재 자격(ig_user_id + 액세스 토큰)입니다.

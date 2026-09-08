@@ -3,6 +3,8 @@ package com.van.cardnews.domain.instagram.service;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.van.cardnews.domain.instagram.dto.request.InstagramTokenRegisterRequest;
+import com.van.cardnews.domain.instagram.dto.response.InstagramTokenRegisterResponse;
 import com.van.cardnews.domain.instagram.dto.response.TokenRefreshResponse;
 import com.van.cardnews.domain.instagram.entity.InstagramToken;
 import com.van.cardnews.domain.instagram.repository.InstagramTokenRepository;
@@ -60,11 +62,18 @@ class InstagramTokenServiceTest {
     /**
      * 서비스가 매번 조회로 현재 토큰을 얻는다는 점이 이 티켓의 핵심이라 조회만 스텁한다.
      * (부팅 시 1회 로드되는 configtree였다면 갱신 결과가 재기동 전까지 보이지 않는다.)
+     *
+     * 등록 경로를 위해 저장·삭제도 같은 1행 슬롯 위에서 흉내낸다. 테이블이 항상 1행이라는
+     * 전제 자체가 등록 로직이 지키려는 것이므로, 스텁도 그 전제를 그대로 표현한다.
      */
     private InstagramTokenRepository repositoryReturningStoredToken() {
         InstagramTokenRepository repository = mock(InstagramTokenRepository.class);
         lenient().when(repository.findFirstByOrderByIdAsc())
                 .thenAnswer(invocation -> Optional.ofNullable(storedToken));
+        lenient().doAnswer(invocation -> storedToken = null)
+                .when(repository).deleteAllInBatch();
+        lenient().when(repository.save(org.mockito.ArgumentMatchers.any(InstagramToken.class)))
+                .thenAnswer(invocation -> storedToken = invocation.getArgument(0));
         return repository;
     }
 
@@ -177,6 +186,49 @@ class InstagramTokenServiceTest {
         assertThatThrownBy(() -> service.current())
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining("재인증");
+    }
+
+    /** 실 토큰을 넣을 유일한 통로다. 넣은 직후 발행 경로가 그 값을 집어야 의미가 있다. */
+    @Test
+    void 등록한_토큰을_바로_읽는다() {
+        InstagramTokenRegisterResponse response = service.register(
+                new InstagramTokenRegisterRequest("17841400000000000", "real-long-lived-token", 5_184_000L));
+
+        assertThat(response.igUserId()).isEqualTo("17841400000000000");
+        assertThat(response.daysUntilExpiry()).isEqualTo(60);
+        assertThat(service.current().accessToken()).isEqualTo("real-long-lived-token");
+        assertThat(service.current().igUserId()).isEqualTo("17841400000000000");
+    }
+
+    /**
+     * loadToken()이 그냥 첫 행을 집으므로, 더미 행이 남아 있으면 실 토큰이 무시된 채
+     * 더미로 Meta를 호출해 401을 받는다. 토큰 부재가 아니라 인증 오류로 보여 추적이 어렵다.
+     */
+    @Test
+    void 등록하면_기존_더미_행이_남지_않는다() {
+        LocalDateTime issuedAt = KoreaTime.now().minusDays(2);
+        givenToken(issuedAt, issuedAt.plusDays(60));
+        assertThat(service.current().accessToken()).isEqualTo(DUMMY_TOKEN);
+
+        service.register(
+                new InstagramTokenRegisterRequest("17841400000000000", "real-long-lived-token", 5_184_000L));
+
+        assertThat(service.current().accessToken()).isEqualTo("real-long-lived-token");
+        assertThat(storedToken.getIgUserId()).isEqualTo("17841400000000000");
+    }
+
+    /** 등록 요청에는 토큰 평문이 실려 오므로, 응답과 로그 양쪽을 함께 본다. */
+    @Test
+    void 등록한_토큰_평문이_응답과_로그에_남지_않는다() {
+        String realToken = "real-long-lived-token";
+
+        InstagramTokenRegisterResponse response =
+                service.register(new InstagramTokenRegisterRequest("17841400000000000", realToken, 5_184_000L));
+
+        assertThat(response.toString()).doesNotContain(realToken);
+        assertThat(allLogs()).doesNotContain(realToken);
+        assertThat(storedToken.toString()).doesNotContain(realToken);
+        assertThat(storedToken.getAccessTokenEncrypted()).doesNotContain(realToken);
     }
 
     @Test

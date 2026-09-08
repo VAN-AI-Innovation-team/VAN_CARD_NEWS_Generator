@@ -16,6 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Cloud Scheduler가 두드릴 /internal/** 의 공유 시크릿 인증 검증.
  * 실제 트리거 엔드포인트는 아직 없으므로 스텁 컨트롤러로 필터체인을 태운다.
+ *
+ * /internal 아래에 scheduler 말고 다른 갈래도 생겼으므로(토큰 등록, VAN-22) 그쪽 경로도
+ * 함께 태운다. 매처가 /internal/scheduler/** 로 좁아지면 새 갈래가 무인증으로 열린다.
  */
 @WebMvcTest(controllers = InternalEndpointSecurityTest.StubInternalController.class)
 @Import({WebConfig.class, InternalEndpointSecurityTest.StubInternalController.class})
@@ -24,6 +27,7 @@ class InternalEndpointSecurityTest {
 
     static final String SECRET = "test-secret-0123456789";
     private static final String PATH = "/internal/scheduler/test-trigger";
+    private static final String NON_SCHEDULER_PATH = "/internal/instagram/test-trigger";
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,6 +47,16 @@ class InternalEndpointSecurityTest {
     @Test
     void 시크릿이_맞으면_통과한다() throws Exception {
         mockMvc.perform(post(PATH).header(WebConfig.SCHEDULER_SECRET_HEADER, SECRET))
+                .andExpect(status().isOk());
+    }
+
+    /** scheduler 갈래 밖의 /internal 경로도 같은 시크릿에 걸린다. */
+    @Test
+    void scheduler가_아닌_internal_경로도_보호된다() throws Exception {
+        mockMvc.perform(post(NON_SCHEDULER_PATH))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post(NON_SCHEDULER_PATH).header(WebConfig.SCHEDULER_SECRET_HEADER, SECRET))
                 .andExpect(status().isOk());
     }
 
@@ -70,6 +84,10 @@ class InternalEndpointSecurityTest {
 
         @PostMapping(PATH)
         void trigger() {
+        }
+
+        @PostMapping(NON_SCHEDULER_PATH)
+        void nonSchedulerTrigger() {
         }
     }
 }
