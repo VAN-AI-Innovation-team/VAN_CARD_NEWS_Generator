@@ -12,6 +12,9 @@ import com.van.cardnews.domain.jobhistory.entity.JobHistory;
 import com.van.cardnews.domain.jobhistory.entity.JobStatus;
 import com.van.cardnews.domain.jobhistory.entity.JobType;
 import com.van.cardnews.domain.jobhistory.repository.JobHistoryRepository;
+import com.van.cardnews.domain.publish.entity.PublishRecord;
+import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
+import com.van.cardnews.domain.publish.service.InstagramPublishService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +31,7 @@ public class ContentManagementService {
     private final ApprovalRequestRepository approvalRequestRepository;
     private final GeneratedCardImageRepository generatedCardImageRepository;
     private final JobHistoryRepository jobHistoryRepository;
+    private final PublishRecordRepository publishRecordRepository;
 
     @Transactional(readOnly = true)
     public List<ContentManagementListResponse> getContents() {
@@ -100,11 +104,17 @@ public class ContentManagementService {
 
         String generationStatus = resolveGenerationStatus(content);
 
+        PublishRecord publishRecord = publishRecordRepository
+                .findTopByContentIdAndChannelOrderByIdDesc(
+                        content.getId(), InstagramPublishService.CHANNEL)
+                .orElse(null);
+
         return ContentManagementListResponse.from(
                 content,
                 cardCount,
                 approvalRequest,
-                generationStatus
+                generationStatus,
+                publishRecord
         );
     }
 

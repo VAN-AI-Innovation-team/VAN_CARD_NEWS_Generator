@@ -81,7 +81,10 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(45deg, #f9ce34, #ee2a7b, #6228d7);
+  object-fit: cover;
+  /* 인스타의 계정 링 */
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 2px #ee2a7b;
   flex-shrink: 0;
 }
 .ig-post__account {
@@ -180,6 +183,38 @@
   color: #1f2733;
 }
 
+/* 실제 게시물의 액션 줄 — 하트·댓글·공유·저장 */
+.ig-post__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px 2px;
+}
+.ig-post__icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #1f2733;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.ig-post__icon--last {
+  margin-left: auto;
+}
+.ig-post__tag {
+  color: #00376b;
+}
+.ig-post__caption-empty {
+  color: #8a94a6;
+  font-style: normal;
+}
+.ig-post__time {
+  display: block;
+  margin-top: 8px;
+  color: #8a94a6;
+  font-size: 11px;
+}
+
 /* 편집 패널 */
 .ig-preview__editor {
   display: flex;
@@ -220,6 +255,99 @@
   color: #b33a3a;
   font-weight: 800;
 }
+/* 발행 시점 선택 */
+.ig-preview__schedule {
+  margin: 6px 0 0;
+  padding: 14px 16px 16px;
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+.ig-preview__schedule legend {
+  padding: 0 6px;
+  color: #526178;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ig-preview__segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #eef1f5;
+}
+.ig-preview__segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #6b7688;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+/* 라디오는 키보드·보조기술을 위해 남기고 화면에서만 지운다. */
+.ig-preview__segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.ig-preview__segment:hover {
+  color: #315985;
+}
+.ig-preview__segment--on {
+  background: #fff;
+  color: #173d73;
+  box-shadow: 0 1px 3px rgba(23, 61, 115, 0.16);
+}
+.ig-preview__segment:has(input:focus-visible) {
+  outline: 2px solid #315985;
+  outline-offset: 1px;
+}
+.ig-preview__when {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin-top: 14px;
+}
+.ig-preview__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ig-preview__field span {
+  color: #8a94a6;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ig-preview__field input {
+  padding: 10px 12px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: #2c3543;
+}
+.ig-preview__field input:focus {
+  outline: none;
+  border-color: #315985;
+}
+.ig-preview__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8a94a6;
+  font-size: 11px;
+}
 .ig-preview__status {
   display: flex;
   align-items: center;
@@ -252,6 +380,14 @@
 .ig-preview__status--success a {
   color: #1f7a55;
   font-weight: 700;
+}
+.ig-preview__status--scheduled {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #d9cfef;
+  background: #f8f5ff;
+  color: #5b3fa8;
 }
 .ig-preview__status--failed {
   flex-direction: column;
