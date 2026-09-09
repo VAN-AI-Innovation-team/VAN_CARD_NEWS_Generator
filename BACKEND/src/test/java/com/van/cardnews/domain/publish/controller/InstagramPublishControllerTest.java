@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -173,5 +174,35 @@ class InstagramPublishControllerTest {
                 .thenThrow(new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
 
         mockMvc.perform(get(PATH)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 캡션_조회는_발행_기록이_없어도_문구를_돌려준다() throws Exception {
+        when(instagramPublishService.caption(42L)).thenReturn("조립된 캡션");
+
+        mockMvc.perform(get(PATH + "/caption"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caption").value("조립된 캡션"));
+    }
+
+    @Test
+    void 캡션_저장은_저장된_문구를_돌려준다() throws Exception {
+        when(instagramPublishService.updateCaption(anyLong(), any())).thenReturn("고친 캡션");
+
+        mockMvc.perform(put(PATH + "/caption")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"고친 캡션\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caption").value("고친 캡션"));
+
+        verify(instagramPublishService).updateCaption(42L, "고친 캡션");
+    }
+
+    @Test
+    void 빈_캡션_저장은_400이다() throws Exception {
+        mockMvc.perform(put(PATH + "/caption")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"  \"}"))
+                .andExpect(status().isBadRequest());
     }
 }

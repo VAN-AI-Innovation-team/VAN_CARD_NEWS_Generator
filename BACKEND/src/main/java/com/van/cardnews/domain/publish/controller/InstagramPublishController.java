@@ -2,8 +2,11 @@ package com.van.cardnews.domain.publish.controller;
 
 import com.van.cardnews.domain.publish.dto.request.InstagramPublishRequest;
 import com.van.cardnews.domain.publish.dto.request.InstagramScheduleRequest;
+import com.van.cardnews.domain.publish.dto.request.PublishCaptionRequest;
+import com.van.cardnews.domain.publish.dto.response.PublishCaptionResponse;
 import com.van.cardnews.domain.publish.dto.response.PublishRecordResponse;
 import com.van.cardnews.domain.publish.service.InstagramPublishService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -53,6 +56,27 @@ public class InstagramPublishController {
     @DeleteMapping("/schedule")
     public ResponseEntity<PublishRecordResponse> cancelSchedule(@PathVariable Long contentId) {
         return ResponseEntity.ok(PublishRecordResponse.from(instagramPublishService.cancel(contentId)));
+    }
+
+    /**
+     * 발행 미리보기용 캡션 조회 — 저장된 수정본이 없으면 조립한 기본값을 준다.
+     *
+     * 발행 기록과 무관하므로 아직 발행을 요청하지 않은 콘텐츠도 조회된다.
+     */
+    @GetMapping("/caption")
+    public ResponseEntity<PublishCaptionResponse> caption(@PathVariable Long contentId) {
+        return ResponseEntity.ok(new PublishCaptionResponse(
+                contentId, instagramPublishService.caption(contentId)));
+    }
+
+    /** 미리보기에서 고친 캡션 저장 — 이후 발행은 이 문구로 나간다. */
+    @PutMapping("/caption")
+    public ResponseEntity<PublishCaptionResponse> updateCaption(
+            @PathVariable Long contentId,
+            @Valid @RequestBody PublishCaptionRequest request
+    ) {
+        return ResponseEntity.ok(new PublishCaptionResponse(
+                contentId, instagramPublishService.updateCaption(contentId, request.caption())));
     }
 
     /** 최신 발행 건의 상태 조회 — 예약·진행·성공·실패를 한 응답으로 본다. */

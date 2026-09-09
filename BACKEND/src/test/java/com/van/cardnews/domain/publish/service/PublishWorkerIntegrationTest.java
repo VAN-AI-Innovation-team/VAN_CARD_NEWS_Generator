@@ -36,7 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * dev 프로필 + MockInstagramClient 기준이며, 폴링 간격만 1ms로 낮춰 테스트가 분 단위로 늘어지지 않게 한다.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.publish.instagram.poll-interval-ms=1")
+@TestPropertySource(properties = {
+        "app.publish.instagram.poll-interval-ms=1",
+        // 인프로세스 트리거를 켜 두면 스케줄러가 이 테스트와 같은 큐를 훑어 선점 횟수 단언이 깨진다.
+        "app.publish.worker.in-process.enabled=false"
+})
 class PublishWorkerIntegrationTest {
 
     @Autowired

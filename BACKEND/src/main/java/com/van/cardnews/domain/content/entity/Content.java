@@ -60,6 +60,13 @@ public class Content {
     @Column(name = "card_image_placements", columnDefinition = "json")
     private JsonNode cardImagePlacements;
 
+    /**
+     * 미리보기에서 사용자가 고친 발행 캡션. {@code null}이면 아직 고친 적이 없다는 뜻이고,
+     * 그때는 {@code PublishTextComposer}가 조립한 값이 쓰인다.
+     */
+    @Column(name = "publish_caption", columnDefinition = "TEXT")
+    private String publishCaption;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -105,6 +112,8 @@ public class Content {
         this.template = template;
         this.cardGenerationResult = null;
         this.cardImagePlacements = null;
+        // 캡션도 같이 버린다. 본문이 바뀐 뒤 옛 문구가 남아 있으면 그게 그대로 발행된다.
+        this.publishCaption = null;
     }
 
     public void removeImagesNotIn(java.util.Set<Long> keepImageIds) {
@@ -130,6 +139,11 @@ public class Content {
     // 2번 필드 업데이트 메서드
     public void updateCardImagePlacements(JsonNode cardImagePlacements) {
         this.cardImagePlacements = cardImagePlacements;
+    }
+
+    /** 캡션은 발행 전용 값이라 카드 구성 결과를 건드리지 않는다. */
+    public void updatePublishCaption(String publishCaption) {
+        this.publishCaption = publishCaption;
     }
 
     public void publish() {

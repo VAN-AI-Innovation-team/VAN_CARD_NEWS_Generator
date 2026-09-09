@@ -74,11 +74,81 @@ export interface InstagramPublishResponse {
   publishedAt: string | null;
 }
 
+/**
+ * 서버가 준 사유를 그대로 화면에 올린다. 발행 경로의 400·409는 "왜 막혔는지"가 전부라
+ * axios의 기본 문구("Request failed with status code 409")로 덮이면 아무 정보도 남지 않는다.
+ */
+async function withServerMessage<T>(request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const message =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data?.message;
+
+      if (typeof message === 'string' && message.trim()) {
+        throw new Error(message);
+      }
+    }
+
+    throw error;
+  }
+}
+
 export async function publishApprovedContentToInstagram(
   contentId: number,
 ): Promise<InstagramPublishResponse> {
-  const response = await axios.post<InstagramPublishResponse>(
-    `/api/contents/${contentId}/publish/instagram`,
+  return withServerMessage(async () => {
+    const response = await axios.post<InstagramPublishResponse>(
+      `/api/contents/${contentId}/publish/instagram`,
+    );
+    return response.data;
+  });
+}
+
+/**
+ * 발행에 나갈 캡션. 미리보기에서 고친 값이 있으면 그것이고, 없으면 서버가 조립한 기본값이다.
+ */
+export async function fetchInstagramPublishCaption(
+  contentId: number,
+): Promise<string> {
+  const response = await axios.get<{ contentId: number; caption: string }>(
+    `/api/contents/${contentId}/publish/instagram/caption`,
   );
-  return response.data;
+  return response.data.caption;
+}
+
+export async function saveInstagramPublishCaption(
+  contentId: number,
+  caption: string,
+): Promise<string> {
+  return withServerMessage(async () => {
+    const response = await axios.put<{ contentId: number; caption: string }>(
+      `/api/contents/${contentId}/publish/instagram/caption`,
+      { caption },
+    );
+    return response.data.caption;
+  });
+}
+
+/**
+ * 최신 발행 건의 상태. 발행을 요청한 적이 없으면 404이므로 그때는 null을 준다 —
+ * 아직 요청 전이라는 것은 오류가 아니라 정상 상태다.
+ */
+export async function fetchInstagramPublishStatus(
+  contentId: number,
+): Promise<InstagramPublishResponse | null> {
+  try {
+    const response = await axios.get<InstagramPublishResponse>(
+      `/api/contents/${contentId}/publish/instagram`,
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }
