@@ -142,10 +142,10 @@ public class InstagramPublishService {
             throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
         }
 
-        // 캡션을 지정하지 않으면 카드 구성 결과에서 만든다. 여기서 확정해 두어야 사전 검증이 실제로
-        // 나갈 문구를 보고, 예약 건도 등록 시점의 문구로 고정된다.
+        // 캡션을 지정하지 않으면 미리보기에서 저장한 문구를, 그것도 없으면 카드 구성 결과에서 만든 문구를 쓴다.
+        // 여기서 확정해 두어야 사전 검증이 실제로 나갈 문구를 보고, 예약 건도 등록 시점의 문구로 고정된다.
         String finalCaption = caption == null || caption.isBlank()
-                ? textComposer.caption(content)
+                ? caption(content)
                 : caption;
 
         // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
@@ -231,6 +231,41 @@ public class InstagramPublishService {
         }
 
         return PublishFailure.UNKNOWN;
+    }
+
+    /**
+     * 발행에 나갈 캡션입니다. 미리보기 화면이 발행 전에 보여 주는 문구가 이것입니다.
+     *
+     * 저장된 수정본이 없으면 매번 조립합니다. 저장하지 않는 한 콘텐츠를 고치면 캡션도 따라옵니다.
+     */
+    @Transactional(readOnly = true)
+    public String caption(Long contentId) {
+        return caption(contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND)));
+    }
+
+    private String caption(Content content) {
+        String saved = content.getPublishCaption();
+
+        return saved == null || saved.isBlank() ? textComposer.caption(content) : saved;
+    }
+
+    /**
+     * 미리보기에서 고친 캡션을 저장합니다.
+     *
+     * 발행 시점이 아니라 여기서 검증하는 이유는, 상한을 넘긴 문구를 저장해 두면 사용자가
+     * 발행 버튼을 누르는 순간에야 그 사실을 알게 되기 때문입니다.
+     */
+    @Transactional
+    public String updateCaption(Long contentId, String caption) {
+        preflightValidator.validateCaption(caption);
+
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        content.updatePublishCaption(caption);
+
+        return caption;
     }
 
     /**

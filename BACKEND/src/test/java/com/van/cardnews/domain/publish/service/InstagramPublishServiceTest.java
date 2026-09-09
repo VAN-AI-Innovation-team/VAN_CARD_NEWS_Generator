@@ -58,6 +58,7 @@ class InstagramPublishServiceTest {
     private static final long CONTENT_ID = 42L;
     private static final String ACTOR_ID = "hanms";
     private static final String COMPOSED_CAPTION = "조립된 캡션";
+    private static final String SAVED_CAPTION = "미리보기에서 고친 캡션";
     private static final long RECORD_ID = 7L;
     private static final int MAX_POLL_COUNT = 3;
     private static final long MIN_LEAD_MINUTES = 5;
@@ -680,6 +681,47 @@ class InstagramPublishServiceTest {
 
         assertThat(record.getCaption()).isEqualTo("직접 쓴 캡션");
         verify(textComposer, never()).caption(any());
+    }
+
+    @Test
+    void 저장된_캡션이_있으면_조립하지_않고_그것으로_발행한다() {
+        givenCards(3);
+        when(content.getPublishCaption()).thenReturn(SAVED_CAPTION);
+
+        PublishRecord record = service.enqueue(CONTENT_ID, null, ACTOR_ID);
+
+        assertThat(record.getCaption()).isEqualTo(SAVED_CAPTION);
+        verify(textComposer, never()).caption(any());
+    }
+
+    @Test
+    void 요청_본문의_캡션은_저장된_캡션보다_우선한다() {
+        givenCards(3);
+        when(content.getPublishCaption()).thenReturn(SAVED_CAPTION);
+
+        assertThat(service.enqueue(CONTENT_ID, "이번만 쓸 캡션", ACTOR_ID).getCaption())
+                .isEqualTo("이번만 쓸 캡션");
+    }
+
+    @Test
+    void 미리보기_캡션은_저장값이_없으면_조립한_기본값이다() {
+        assertThat(service.caption(CONTENT_ID)).isEqualTo(COMPOSED_CAPTION);
+
+        when(content.getPublishCaption()).thenReturn(SAVED_CAPTION);
+
+        assertThat(service.caption(CONTENT_ID)).isEqualTo(SAVED_CAPTION);
+    }
+
+    @Test
+    void 캡션_저장은_규격을_먼저_검증한다() {
+        doThrow(new CustomException(ErrorCode.INVALID_CAPTION))
+                .when(preflightValidator).validateCaption(any());
+
+        assertThatThrownBy(() -> service.updateCaption(CONTENT_ID, "너무 긴 캡션"))
+                .isInstanceOf(CustomException.class);
+
+        // 검증에 걸린 문구는 저장되지 않는다.
+        verify(content, never()).updatePublishCaption(any());
     }
 
     @Test

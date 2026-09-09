@@ -36,7 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * dev 프로필 + MockInstagramClient 기준이며, 폴링 간격만 1ms로 낮춰 테스트가 분 단위로 늘어지지 않게 한다.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.publish.instagram.poll-interval-ms=1")
+@TestPropertySource(properties = {
+        "app.publish.instagram.poll-interval-ms=1",
+        // 인프로세스 트리거를 켜 두면 스케줄러가 이 테스트와 같은 큐를 훑어 선점 횟수 단언이 깨진다.
+        "app.publish.worker.in-process.enabled=false"
+})
 class PublishWorkerIntegrationTest {
 
     @Autowired
@@ -136,6 +140,36 @@ class PublishWorkerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT permalink FROM publish_records WHERE id = ?", String.class, recordId))
                 .startsWith("https://www.instagram.com/p/");
+    }
+
+    @Test
+    void runNow는_배치를_기다리지_않고_그_콘텐츠의_도래한_건을_발행한다() {
+        Long recordId = insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SUCCESS.name());
+    }
+
+    @Test
+    void runNow를_두_번_불러도_발행_호출은_1회다() {
+        insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+        publishWorker.runNow(contentId);
+
+        assertThat(callCount("publishContainer")).isEqualTo(1);
+    }
+
+    @Test
+    void runNow는_아직_도래하지_않은_예약을_앞당기지_않는다() {
+        Long recordId = insertScheduled(KoreaTime.now().plusMinutes(30));
+
+        publishWorker.runNow(contentId);
+
+        // 즉시 발행도 SCHEDULED를 쓰므로 상태만으로는 예약과 구분되지 않는다. 시각이 그 구분이다.
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SCHEDULED.name());
+        assertThat(instagramClient.calls()).isEmpty();
     }
 
     @Test
