@@ -10,11 +10,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface PublishRecordRepository
         extends JpaRepository<PublishRecord, Long> {
 
     List<PublishRecord> findByContentIdOrderByIdDesc(Long contentId);
+
+    /** 해당 채널의 최신 발행 건. 없는 것은 정상이므로 Optional로 준다. */
+    Optional<PublishRecord> findTopByContentIdAndChannelOrderByIdDesc(Long contentId, String channel);
 
     /**
      * 워커가 실행할 대상을 가져옵니다.

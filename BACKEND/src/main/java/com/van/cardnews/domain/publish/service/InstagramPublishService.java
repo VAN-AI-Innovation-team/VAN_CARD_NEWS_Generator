@@ -273,9 +273,8 @@ public class InstagramPublishService {
      */
     @Transactional(readOnly = true)
     public PublishRecord latest(Long contentId) {
-        return publishRecordRepository.findByContentIdOrderByIdDesc(contentId).stream()
-                .filter(record -> CHANNEL.equals(record.getChannel()))
-                .findFirst()
+        return publishRecordRepository
+                .findTopByContentIdAndChannelOrderByIdDesc(contentId, CHANNEL)
                 .orElseThrow(() -> new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
     }
 

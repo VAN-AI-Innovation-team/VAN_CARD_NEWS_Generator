@@ -138,6 +138,16 @@ export interface ContentPreviewResponse {
   images: PreviewImage[];
   generationStatus:
     'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'IMAGE_PENDING' | null;
+  /** 최신 인스타그램 발행 건의 상태. 요청한 적이 없으면 null. */
+  publishStatus:
+    | 'SCHEDULED'
+    | 'PENDING'
+    | 'PROCESSING'
+    | 'SUCCESS'
+    | 'FAILED'
+    | 'CANCELED'
+    | null;
+  publishScheduledAt: string | null;
 }
 
 export async function createContent(
@@ -476,6 +486,16 @@ export interface ContentManagementListItem {
   approvalRequestId: number | null;
   generationStatus:
     'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'IMAGE_PENDING' | null;
+  /** 최신 인스타그램 발행 건의 상태. 요청한 적이 없으면 null. */
+  publishStatus:
+    | 'SCHEDULED'
+    | 'PENDING'
+    | 'PROCESSING'
+    | 'SUCCESS'
+    | 'FAILED'
+    | 'CANCELED'
+    | null;
+  publishScheduledAt: string | null;
 }
 
 export interface ContentHistoryPageResponse {

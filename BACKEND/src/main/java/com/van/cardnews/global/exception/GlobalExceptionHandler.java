@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -47,6 +48,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(e.getErrorCode().getStatus())
                 .body(ErrorResponse.of(e.getErrorCode(), e.getMessage()));
+    }
+
+    /**
+     * 매핑이 없는 경로. 아래 Exception 핸들러가 받으면 500이 되는데, 없는 경로는 서버 오류가 아니다.
+     * 500으로 답하면 화면은 "서버가 고장났다"로 읽고, 실제 원인(구 버전이 떠 있어 엔드포인트가 없음)은 가려진다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e) {
+        log.warn("존재하지 않는 경로: {}", e.getResourcePath());
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(
+                        404,
+                        "NOT_FOUND",
+                        "요청한 경로를 찾을 수 없습니다.",
+                        KoreaTime.now()
+                ));
     }
 
     /** 그 외 예상하지 못한 예외 */

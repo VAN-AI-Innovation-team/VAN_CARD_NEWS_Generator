@@ -83,10 +83,15 @@ async function withServerMessage<T>(request: () => Promise<T>): Promise<T> {
     return await request();
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      const data = error.response?.data;
+      // 서버가 JSON 오류를 못 만들고 컨테이너가 끼어들면 본문은 HTML 오류 페이지다.
+      // 그것을 사유로 올리면 화면에 페이지 원문이 통째로 찍혀 아무것도 읽히지 않는다.
       const message =
-        typeof error.response?.data === 'string'
-          ? error.response.data
-          : error.response?.data?.message;
+        typeof data === 'string'
+          ? data.trimStart().startsWith('<')
+            ? null
+            : data
+          : data?.message;
 
       if (typeof message === 'string' && message.trim()) {
         throw new Error(message);
@@ -120,6 +125,36 @@ export async function runInstagramPublishNow(
   return withServerMessage(async () => {
     const response = await axios.post<InstagramPublishResponse>(
       `/api/contents/${contentId}/publish/instagram/run`,
+    );
+    return response.data;
+  });
+}
+
+/**
+ * 예약 발행 등록. 시각은 Asia/Seoul 기준의 로컬 시각 문자열(YYYY-MM-DDTHH:mm)이다 —
+ * 서버가 LocalDateTime으로 받으므로 타임존을 붙이면 안 된다.
+ */
+export async function scheduleInstagramPublish(
+  contentId: number,
+  scheduledAt: string,
+  caption: string,
+): Promise<InstagramPublishResponse> {
+  return withServerMessage(async () => {
+    const response = await axios.post<InstagramPublishResponse>(
+      `/api/contents/${contentId}/publish/instagram/schedule`,
+      { scheduledAt, caption },
+    );
+    return response.data;
+  });
+}
+
+/** 예약 취소. 워커가 이미 집어간 건은 409로 막힌다. */
+export async function cancelInstagramSchedule(
+  contentId: number,
+): Promise<InstagramPublishResponse> {
+  return withServerMessage(async () => {
+    const response = await axios.delete<InstagramPublishResponse>(
+      `/api/contents/${contentId}/publish/instagram/schedule`,
     );
     return response.data;
   });

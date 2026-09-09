@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -120,6 +121,12 @@ class InstagramPublishServiceTest {
                     Collections.reverse(reversed);
                     return reversed;
                 });
+        // 파생 쿼리의 Top…OrderByIdDesc — 저장 순서의 마지막이 최신이다.
+        lenient().when(publishRecordRepository
+                        .findTopByContentIdAndChannelOrderByIdDesc(anyLong(), anyString()))
+                .thenAnswer(invocation -> savedRecords.stream()
+                        .filter(record -> invocation.getArgument(1).equals(record.getChannel()))
+                        .reduce((first, second) -> second));
 
         tokenService = mock(InstagramTokenService.class);
         lenient().when(tokenService.current())
