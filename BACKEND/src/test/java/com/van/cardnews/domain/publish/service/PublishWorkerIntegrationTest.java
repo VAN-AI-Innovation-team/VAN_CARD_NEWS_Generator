@@ -143,6 +143,36 @@ class PublishWorkerIntegrationTest {
     }
 
     @Test
+    void runNow는_배치를_기다리지_않고_그_콘텐츠의_도래한_건을_발행한다() {
+        Long recordId = insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SUCCESS.name());
+    }
+
+    @Test
+    void runNow를_두_번_불러도_발행_호출은_1회다() {
+        insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+        publishWorker.runNow(contentId);
+
+        assertThat(callCount("publishContainer")).isEqualTo(1);
+    }
+
+    @Test
+    void runNow는_아직_도래하지_않은_예약을_앞당기지_않는다() {
+        Long recordId = insertScheduled(KoreaTime.now().plusMinutes(30));
+
+        publishWorker.runNow(contentId);
+
+        // 즉시 발행도 SCHEDULED를 쓰므로 상태만으로는 예약과 구분되지 않는다. 시각이 그 구분이다.
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SCHEDULED.name());
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    @Test
     void 아직_도래하지_않은_예약은_건드리지_않는다() {
         Long recordId = insertScheduled(KoreaTime.now().plusMinutes(30));
 

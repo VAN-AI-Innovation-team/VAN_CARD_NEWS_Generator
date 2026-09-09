@@ -109,6 +109,23 @@ export async function publishApprovedContentToInstagram(
 }
 
 /**
+ * 큐에 넣은 건을 서버가 이 요청 안에서 실행하게 한다.
+ *
+ * 발행 자체가 이 요청 안에서 일어나므로 응답까지 몇 분이 걸린다. 화면은 이 응답을 기다리지 않고
+ * 상태 조회로 진행을 본다 — 이 호출의 역할은 "지금 실행해 달라"는 신호뿐이다.
+ */
+export async function runInstagramPublishNow(
+  contentId: number,
+): Promise<InstagramPublishResponse> {
+  return withServerMessage(async () => {
+    const response = await axios.post<InstagramPublishResponse>(
+      `/api/contents/${contentId}/publish/instagram/run`,
+    );
+    return response.data;
+  });
+}
+
+/**
  * 발행에 나갈 캡션. 미리보기에서 고친 값이 있으면 그것이고, 없으면 서버가 조립한 기본값이다.
  */
 export async function fetchInstagramPublishCaption(

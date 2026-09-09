@@ -3,6 +3,7 @@ package com.van.cardnews.domain.publish.controller;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.service.InstagramPublishService;
+import com.van.cardnews.domain.publish.service.PublishWorker;
 import com.van.cardnews.global.config.WebConfig;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
@@ -45,6 +46,10 @@ class InstagramPublishControllerTest {
 
     @MockBean
     private InstagramPublishService instagramPublishService;
+
+    // 컨트롤러가 실행 트리거로 워커를 직접 부른다. 이 테스트가 보는 것은 응답 계약이라 실행은 목킹한다.
+    @MockBean
+    private PublishWorker publishWorker;
 
     private PublishRecord record(String igMediaId, String permalink) {
         Content content = mock(Content.class);

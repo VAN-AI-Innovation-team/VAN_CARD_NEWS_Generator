@@ -45,6 +45,43 @@ public class PublishWorker {
     private long graceMinutes;
 
     /**
+     * 한 콘텐츠의 도래한 발행 건을 <b>지금 이 요청 안에서</b> 실행합니다.
+     * 화면이 발행 버튼을 누른 직후 호출합니다.
+     *
+     * 배치({@link #runDue()})가 아니라 이 경로가 따로 있는 이유는 Cloud Run의 CPU 할당 때문입니다.
+     * 이 서비스는 CPU 스로틀링이 켜진 기본 설정이라 <b>요청을 처리하는 동안에만</b> CPU가 나옵니다.
+     * 컨테이너 폴링에 수 분이 걸리는 발행을 요청 밖(스케줄러 스레드)에서 돌리면 그 스레드는 기어갑니다.
+     * 그래서 사용자가 기다리는 발행은 사용자의 요청 스레드가 직접 끝냅니다.
+     *
+     * 이미 끝났거나 다른 워커가 선점한 건은 건드리지 않고 현재 상태를 그대로 돌려줍니다 —
+     * 화면은 이 응답이 아니라 상태 조회로 결과를 보므로, 여기서 예외를 던질 이유가 없습니다.
+     *
+     * ponytail: 요청 타임아웃(300초)이 컨테이너 폴링 상한(60초 × 5회)과 거의 같다. 최악의 경우
+     * 요청이 먼저 끊기지만 그때도 건은 PROCESSING으로 남아 stuck 회수 경로가 집어간다.
+     * 여유가 필요해지면 INSTAGRAM_POLL_INTERVAL_MS·MAX_POLL_COUNT로 줄인다.
+     */
+    public PublishRecord runNow(Long contentId) {
+        PublishRecord record = instagramPublishService.latest(contentId);
+
+        if (!DUE_STATUSES.contains(record.getStatus())) {
+            return record;
+        }
+
+        // 아직 도래하지 않은 예약은 앞당기지 않는다. 즉시 발행도 SCHEDULED를 쓰기 때문에
+        // 상태만으로는 "지금 눌린 건"과 "내일 나갈 예약"이 구분되지 않는다 — 시각이 그 구분이다.
+        if (record.getScheduledAt().isAfter(KoreaTime.now())) {
+            return record;
+        }
+
+        // 선점은 배치와 같은 조건부 UPDATE 한 곳을 지난다. 그래서 둘이 겹쳐도 발행은 1회다.
+        if (publishRecordRepository.claim(record.getId(), KoreaTime.now()) != 1) {
+            return record;
+        }
+
+        return instagramPublishService.execute(record.getId());
+    }
+
+    /**
      * 회수 → 유예 정리 → 도래 건 발행 순서로 1회 실행합니다.
      *
      * 이 메서드에 {@code @Transactional}이 없는 것은 의도입니다. 선점(claim)과 발행이 한 트랜잭션에 묶이면

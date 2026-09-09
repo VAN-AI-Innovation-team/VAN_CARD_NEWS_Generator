@@ -6,6 +6,7 @@ import com.van.cardnews.domain.publish.dto.request.PublishCaptionRequest;
 import com.van.cardnews.domain.publish.dto.response.PublishCaptionResponse;
 import com.van.cardnews.domain.publish.dto.response.PublishRecordResponse;
 import com.van.cardnews.domain.publish.service.InstagramPublishService;
+import com.van.cardnews.domain.publish.service.PublishWorker;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class InstagramPublishController {
 
     private final InstagramPublishService instagramPublishService;
+    private final PublishWorker publishWorker;
 
     /** 발행 요청 — 승인 게이트를 통과하면 큐에 등록하고 202. */
     @PostMapping
@@ -56,6 +58,20 @@ public class InstagramPublishController {
     @DeleteMapping("/schedule")
     public ResponseEntity<PublishRecordResponse> cancelSchedule(@PathVariable Long contentId) {
         return ResponseEntity.ok(PublishRecordResponse.from(instagramPublishService.cancel(contentId)));
+    }
+
+    /**
+     * 큐에 넣은 건을 이 요청 안에서 실행합니다. 화면이 발행 요청 직후 이어서 호출합니다.
+     *
+     * 등록(202)과 실행을 나눈 채로 두면 실행을 깨우는 주체가 배포 환경에 있어야 하는데,
+     * Cloud Scheduler 잡(VAN-24)이 아직 없고 인프로세스 스케줄러는 CPU 스로틀링 때문에
+     * 요청 밖에서 신뢰할 수 없습니다. 그래서 사용자가 기다리는 발행만큼은 사용자의 요청이 끝냅니다.
+     *
+     * 응답을 기다리지 않아도 됩니다 — 진행 상황은 상태 조회로 봅니다.
+     */
+    @PostMapping("/run")
+    public ResponseEntity<PublishRecordResponse> run(@PathVariable Long contentId) {
+        return ResponseEntity.ok(PublishRecordResponse.from(publishWorker.runNow(contentId)));
     }
 
     /**

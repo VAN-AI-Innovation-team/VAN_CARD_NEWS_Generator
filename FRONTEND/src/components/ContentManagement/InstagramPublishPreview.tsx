@@ -3,6 +3,7 @@ import {
   fetchInstagramPublishCaption,
   fetchInstagramPublishStatus,
   publishApprovedContentToInstagram,
+  runInstagramPublishNow,
   saveInstagramPublishCaption,
   type InstagramPublishResponse,
 } from '../../api/approvalApi';
@@ -181,6 +182,17 @@ export default function InstagramPublishPreview({
       }
 
       setRecord(await publishApprovedContentToInstagram(contentId));
+
+      // 큐에 넣는 것만으로는 발행이 일어나지 않는다. 실행까지 요청해야 하고, 그 요청 안에서
+      // 컨테이너 폴링이 끝나므로 응답까지 몇 분이 걸린다. 진행 상황은 이 응답이 아니라
+      // 상태 폴링이 보여주므로 여기서 기다리지 않는다.
+      void runInstagramPublishNow(contentId)
+        .then(setRecord)
+        .catch((runError: unknown) => {
+          // 실행 요청이 끊겨도 건은 큐에 남아 회수·재시도 경로가 집어간다.
+          // 화면을 실패로 바꾸지 않고 폴링이 보는 실제 상태를 따른다.
+          console.warn('발행 실행 요청이 끝까지 가지 못했습니다.', runError);
+        });
     } catch (publishError) {
       setError(
         publishError instanceof Error
