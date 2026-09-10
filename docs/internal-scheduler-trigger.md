@@ -51,8 +51,51 @@ gcloud run services update van-card-news-backend \
   --update-secrets=INTERNAL_SCHEDULER_SECRET=internal-scheduler-secret:latest
 ```
 
-Cloud Scheduler 잡은 두드릴 로직이 생기는 시점(예약 발행 / 토큰 갱신 이슈)에 만든다.
 잡을 만들 때 헤더로 같은 시크릿을 실어 보내고, **재시도는 앱 코드가 아니라 잡의 재시도 설정**을 쓴다.
+
+## 등록된 잡
+
+| 잡 | 주기 | 대상 |
+|---|---|---|
+| `instagram-publish-due` | `*/5 * * * *` (Asia/Seoul) | `/internal/scheduler/publish-due` |
+| `instagram-token-refresh` | 주 1회 | `/internal/scheduler/refresh-token` — 아직 미등록, `docs/instagram-token.md` 참고 |
+
+```bash
+# Cloud Scheduler API는 프로젝트에 한 번 켜면 된다
+gcloud services enable cloudscheduler.googleapis.com --project van-card-news-generator
+
+# 시크릿은 화면에 찍지 말고 Secret Manager에서 바로 헤더로 넘긴다
+SEC=$(gcloud secrets versions access latest --secret=internal-scheduler-secret \
+  --project van-card-news-generator)
+
+gcloud scheduler jobs create http instagram-publish-due \
+  --location=asia-northeast3 --project=van-card-news-generator \
+  --schedule="*/5 * * * *" --time-zone=Asia/Seoul \
+  --uri=https://van-card-news-backend-tnkjwa5riq-du.a.run.app/internal/scheduler/publish-due \
+  --http-method=POST \
+  --headers="X-Scheduler-Secret=$SEC" \
+  --max-retry-attempts=3
+```
+
+**주기를 5분으로 잡은 이유.** 워커는 `app.publish.worker.grace-minutes=60`을 넘긴 예약을 `expired`로
+버린다(다운타임 뒤 하루치를 몰아 올리는 사고를 막는 장치). 트리거 주기가 이 상한에 가까우면 그 장치가
+정상 건까지 버린다. 5분은 예약 리드타임 하한 `app.publish.schedule.min-lead-minutes=5`와도 맞는다.
+
+즉시 발행은 이 잡과 무관하다 — `POST /api/contents/{id}/publish/instagram/run`이 요청 안에서 끝낸다.
+이 잡이 담당하는 것은 **예약 발행의 정시 실행**이다.
+
+```bash
+# 손으로 한 번 돌려보기 (다음 정각을 기다리지 않는다)
+gcloud scheduler jobs run instagram-publish-due --location=asia-northeast3 \
+  --project van-card-news-generator
+
+# 실제로 두드렸는지는 잡 상태가 아니라 Cloud Run 요청 로그로 확인한다
+gcloud logging read 'resource.type="cloud_run_revision" AND httpRequest.requestUrl:"publish-due"' \
+  --project van-card-news-generator --limit=5 --freshness=15m \
+  --format='value(timestamp,httpRequest.status,httpRequest.latency)'
+```
+
+인스턴스가 잠들어 있으면 첫 호출은 콜드스타트로 20초 넘게 걸린다. 잡의 기본 타임아웃(3분) 안이다.
 
 ## 향후 승격 경로
 
