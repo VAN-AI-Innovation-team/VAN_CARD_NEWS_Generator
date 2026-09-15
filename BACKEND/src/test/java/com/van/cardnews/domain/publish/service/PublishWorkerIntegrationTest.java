@@ -39,9 +39,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "app.publish.instagram.poll-interval-ms=1",
         // 인프로세스 트리거를 켜 두면 스케줄러가 이 테스트와 같은 큐를 훑어 선점 횟수 단언이 깨진다.
-        "app.publish.worker.in-process.enabled=false"
+        "app.publish.worker.in-process.enabled=false",
+        // 기본값(3)과 일부러 다르게 잡는다 — 오버라이드가 안 먹으면 상한 소진 테스트가 실패하도록.
+        "app.publish.retry.max-count=2"
 })
 class PublishWorkerIntegrationTest {
+
+    private static final int MAX_RETRY_COUNT = 2;
 
     @Autowired
     private PublishWorker publishWorker;
@@ -182,14 +186,32 @@ class PublishWorkerIntegrationTest {
         assertThat(instagramClient.calls()).isEmpty();
     }
 
+    /**
+     * 워커가 발행 도중 죽는 원인은 대개 앱이 아니라 인프라다(인스턴스 메모리 초과 등).
+     * 곧바로 FAILED로 못박으면 Meta가 거절한 건은 자동 재시도되는데 우리 쪽 사고로 죽은 건만
+     * 사람이 다시 요청해야 하는 뒤집힌 정책이 된다. 상한이 남아 있으면 다시 큐에 올린다.
+     */
     @Test
-    void PROCESSING에서_멈춘_건은_임계_시간을_넘기면_회수된다() {
-        // 워커가 발행 도중 죽은 상태 — 아무도 손대지 않으면 영구 정체된다
+    void PROCESSING에서_멈춘_건은_임계_시간을_넘기면_재시도로_회수된다() {
         Long recordId = insertProcessing(KoreaTime.now().minusMinutes(30));
 
         publishWorker.runDue();
 
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SCHEDULED.name());
+        assertThat(retryCountOf(recordId)).isEqualTo(1);
+        // 재예약 시각이 아직 도래하지 않았으므로 같은 회차에 발행되지는 않는다
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    /** 무한 재선점은 재시도 상한이 막는다 — 상한을 소진한 건은 FAILED로 정리된다. */
+    @Test
+    void 재시도_상한을_소진한_채_멈춘_건은_실패로_정리된다() {
+        Long recordId = insertProcessing(KoreaTime.now().minusMinutes(30), MAX_RETRY_COUNT);
+
+        publishWorker.runDue();
+
         assertThat(statusOf(recordId)).isEqualTo(PublishStatus.FAILED.name());
+        assertThat(retryCountOf(recordId)).isEqualTo(MAX_RETRY_COUNT);
     }
 
     @Test
@@ -218,12 +240,22 @@ class PublishWorkerIntegrationTest {
 
     /** 워커가 선점만 해 놓고 죽은 상태를 만든다. */
     private Long insertProcessing(LocalDateTime processingStartedAt) {
+        return insertProcessing(processingStartedAt, 0);
+    }
+
+    private Long insertProcessing(LocalDateTime processingStartedAt, int retryCount) {
         PublishRecord record = PublishRecord.schedule(
                 content(), InstagramPublishService.CHANNEL, "캡션", processingStartedAt);
         record.markProcessing();
         ReflectionTestUtils.setField(record, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(record, "retryCount", retryCount);
 
         return publishRecordRepository.save(record).getId();
+    }
+
+    private int retryCountOf(Long recordId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT retry_count FROM publish_records WHERE id = ?", Integer.class, recordId);
     }
 
     private Content content() {
