@@ -337,10 +337,19 @@ public class InstagramPublishService {
                     credentials, card.getImageUrl(), textComposer.altText(record.getContent(), card)));
         }
 
+        // 자식이 준비되기 전에 발행하면 Meta가 400(code 9007/2207027)으로 거절한다. 부모가 FINISHED라는 것이
+        // 자식까지 끝났다는 뜻은 아니어서, 부모만 기다리면 부모가 빨리 끝날수록 오히려 실패한다.
+        // 폴링 예산은 전체가 나눠 쓴다 — 컨테이너마다 상한을 따로 주면 최악 소요가 컨테이너 수만큼 늘어
+        // 요청 타임아웃(600초)과 스케줄러 attemptDeadline을 넘긴다.
+        int pollBudget = maxPollCount;
+        for (String childId : childIds) {
+            pollBudget = awaitFinished(credentials, childId, pollBudget);
+        }
+
         // 컨테이너는 생성 후 24시간에 만료되므로 재시도 때도 매번 새로 만든다(재사용 금지).
         String containerId = instagramClient.createCarouselContainer(credentials, childIds, caption);
 
-        awaitFinished(credentials, containerId);
+        awaitFinished(credentials, containerId, pollBudget);
 
         String igMediaId = instagramClient.publishContainer(credentials, containerId);
         String permalink = instagramClient.getPermalink(credentials, igMediaId);
@@ -359,36 +368,44 @@ public class InstagramPublishService {
     }
 
     /**
-     * 컨테이너가 처리될 때까지 기다립니다.
+     * 컨테이너가 처리될 때까지 기다리고, 쓰고 남은 폴링 예산을 돌려줍니다.
+     *
+     * 예산은 한 건의 발행이 여러 컨테이너(자식 n개 + 부모)를 기다리는 동안 공유합니다.
+     * 이미 FINISHED면 대기 없이 돌아오므로, 평소에는 상태 조회 몇 번만 늘어납니다.
      */
-    private void awaitFinished(InstagramCredentials credentials, String containerId) {
-        for (int attempt = 1; attempt <= maxPollCount; attempt++) {
+    private int awaitFinished(InstagramCredentials credentials, String containerId, int pollBudget) {
+        int remaining = pollBudget;
+
+        while (true) {
             InstagramClient.ContainerStatus status =
                     instagramClient.getContainerStatus(credentials, containerId);
 
             switch (status) {
                 case FINISHED, PUBLISHED -> {
-                    return;
+                    return remaining;
                 }
                 case ERROR -> throw new InstagramPublishException(
                         PublishFailure.CONTAINER_ERROR, "컨테이너 처리가 실패했습니다 (ERROR).");
                 case EXPIRED -> throw new InstagramPublishException(
                         PublishFailure.CONTAINER_EXPIRED,
                         "컨테이너가 만료됐습니다 (EXPIRED). 생성 후 24시간이 지나면 재사용할 수 없습니다.");
-                case IN_PROGRESS -> sleepBeforeNextPoll(attempt);
+                case IN_PROGRESS -> {
+                    remaining--;
+
+                    if (remaining <= 0) {
+                        throw new InstagramPublishException(
+                                PublishFailure.UNKNOWN,
+                                "컨테이너 처리가 " + maxPollCount + "회 폴링("
+                                        + pollIntervalMs + "ms 간격) 안에 끝나지 않았습니다.");
+                    }
+
+                    sleepBeforeNextPoll();
+                }
             }
         }
-
-        throw new InstagramPublishException(
-                PublishFailure.UNKNOWN,
-                "컨테이너 처리가 " + maxPollCount + "회 폴링(" + pollIntervalMs + "ms 간격) 안에 끝나지 않았습니다.");
     }
 
-    private void sleepBeforeNextPoll(int attempt) {
-        if (attempt >= maxPollCount) {
-            return;
-        }
-
+    private void sleepBeforeNextPoll() {
         try {
             Thread.sleep(pollIntervalMs);
         } catch (InterruptedException e) {

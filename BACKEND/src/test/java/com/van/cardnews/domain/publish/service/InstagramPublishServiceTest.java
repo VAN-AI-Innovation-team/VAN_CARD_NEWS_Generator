@@ -61,7 +61,11 @@ class InstagramPublishServiceTest {
     private static final String COMPOSED_CAPTION = "조립된 캡션";
     private static final String SAVED_CAPTION = "미리보기에서 고친 캡션";
     private static final long RECORD_ID = 7L;
-    private static final int MAX_POLL_COUNT = 3;
+    /**
+     * 폴링 예산은 자식 컨테이너 n개와 부모가 나눠 쓴다. Mock은 컨테이너마다 IN_PROGRESS를 한 번 돌려주므로
+     * 카드 3장짜리 발행은 자식 3 + 부모 1 = 4를 쓴다. 상한을 그보다 낮게 두면 정상 발행이 예산 초과로 막힌다.
+     */
+    private static final int MAX_POLL_COUNT = 6;
     private static final long MIN_LEAD_MINUTES = 5;
     private static final long MAX_HORIZON_DAYS = 30;
     private static final int MAX_RETRY_COUNT = 2;
@@ -309,10 +313,16 @@ class InstagramPublishServiceTest {
 
         publish("캡션");
 
+        // 자식이 FINISHED가 되기 전에 부모를 만들어 발행하면 Meta가 400(9007/2207027)으로 거절한다.
+        // 그래서 자식 상태 확인이 createCarouselContainer보다 앞에 온다.
         assertThat(instagramClient.calls()).containsExactly(
                 "remainingQuota",
                 "createCarouselItem:https://example.com/card-0.jpg|alt",
                 "createCarouselItem:https://example.com/card-1.jpg|alt",
+                "getContainerStatus:mock-child-1",
+                "getContainerStatus:mock-child-1",
+                "getContainerStatus:mock-child-2",
+                "getContainerStatus:mock-child-2",
                 "createCarouselContainer:2|caption",
                 "getContainerStatus:mock-carousel-3",
                 "getContainerStatus:mock-carousel-3",
@@ -336,14 +346,17 @@ class InstagramPublishServiceTest {
         assertThat(instagramClient.calls()).containsExactly("remainingQuota");
     }
 
-    /** 폴링 루프가 dev에서도 실제로 도는지 — IN_PROGRESS 한 번을 거쳐 FINISHED에 닿아야 한다. */
+    /**
+     * 폴링 루프가 dev에서도 실제로 도는지 — IN_PROGRESS 한 번을 거쳐 FINISHED에 닿아야 한다.
+     * 자식 1개와 부모 1개를 각각 2회씩 확인하므로 4회다.
+     */
     @Test
     void 컨테이너가_처리될_때까지_폴링한다() {
         givenCards(1);
 
         publish("캡션");
 
-        assertThat(callCount("getContainerStatus")).isEqualTo(2);
+        assertThat(callCount("getContainerStatus")).isEqualTo(4);
     }
 
     @Test
@@ -358,6 +371,24 @@ class InstagramPublishServiceTest {
         assertThat(record.getFailureType()).isEqualTo(PublishFailure.UNKNOWN);
         assertThat(callCount("getContainerStatus")).isEqualTo(MAX_POLL_COUNT);
         assertThat(callCount("publishContainer")).isZero();
+    }
+
+    /**
+     * 2026-09-15 운영 회귀: 자식이 준비되기 전에 발행해 Meta가 400(9007/2207027)으로 거절했다.
+     * 부모가 FINISHED라는 사실이 자식까지 끝났다는 뜻이 아니므로, 자식 전부를 먼저 확인해야 한다.
+     */
+    @Test
+    void 자식_컨테이너가_모두_끝나기_전에는_부모를_만들지_않는다() {
+        givenCards(2);
+
+        publish("캡션");
+
+        List<String> calls = instagramClient.calls();
+        int parentCreated = calls.indexOf("createCarouselContainer:2|caption");
+
+        assertThat(parentCreated).isPositive();
+        assertThat(calls.subList(0, parentCreated))
+                .contains("getContainerStatus:mock-child-1", "getContainerStatus:mock-child-2");
     }
 
     @Test
