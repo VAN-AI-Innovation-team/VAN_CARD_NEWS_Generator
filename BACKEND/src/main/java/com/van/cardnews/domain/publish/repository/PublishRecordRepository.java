@@ -57,10 +57,34 @@ public interface PublishRecordRepository
     int claim(Long id, LocalDateTime now);
 
     /**
-     * PROCESSING 상태로 멈춘 건을 회수합니다.
+     * PROCESSING 상태로 멈춘 건을 <b>재시도 상한 안에서</b> 다시 큐에 올립니다.
      *
-     * 워커가 발행 도중 죽으면(인스턴스 강제 종료 등) 그 건은 아무도 손대지 않아 영구 정체됩니다.
-     * SCHEDULED로 되돌리지 않고 FAILED로 두는 이유는, 되돌리면 매번 죽는 건이 무한히 재선점되기 때문입니다.
+     * 워커가 발행 도중 죽는 원인은 대개 앱이 아니라 인프라입니다(인스턴스 메모리 초과로 강제 종료 등).
+     * 그런 건을 곧바로 FAILED로 못박으면, Meta가 거절한 건은 자동 재시도되는데 정작 우리 쪽 사고로 죽은 건은
+     * 사람이 다시 요청해야만 올라가는 뒤집힌 정책이 됩니다.
+     *
+     * 무한 재선점은 {@code retryCount} 상한이 막습니다 — 매번 죽는 건은 상한을 소진하고 {@link #failStuck}이
+     * FAILED로 정리합니다. 그래서 이 메서드를 먼저 돌리고 failStuck을 뒤에 돌려야 합니다.
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            update PublishRecord r
+               set r.status = com.van.cardnews.domain.publish.entity.PublishStatus.SCHEDULED,
+                   r.retryCount = r.retryCount + 1,
+                   r.scheduledAt = :retryAt,
+                   r.processingStartedAt = null,
+                   r.errorMessage = :message
+             where r.status = com.van.cardnews.domain.publish.entity.PublishStatus.PROCESSING
+               and r.processingStartedAt < :threshold
+               and r.retryCount < :maxRetryCount
+            """)
+    int retryStuck(LocalDateTime threshold, LocalDateTime retryAt, String message, int maxRetryCount);
+
+    /**
+     * 재시도 상한까지 소진한 채 PROCESSING으로 멈춘 건을 FAILED로 정리합니다.
+     *
+     * {@link #retryStuck}을 먼저 돌린 뒤 호출해야 합니다. 그래야 여기 남는 것이 "상한을 다 쓴 건"뿐입니다.
      * 회수된 건은 원인을 모르므로 failure_type 없이 FAILED로 남습니다. 다시 올릴지는 사용자가 판단합니다.
      */
     @Transactional

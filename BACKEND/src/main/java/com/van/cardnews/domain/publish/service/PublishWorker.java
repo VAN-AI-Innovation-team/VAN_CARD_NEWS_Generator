@@ -4,6 +4,7 @@ import com.van.cardnews.domain.publish.dto.response.PublishWorkerResponse;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
+import com.van.cardnews.global.publish.instagram.PublishFailure;
 import com.van.cardnews.global.time.KoreaTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,8 @@ public class PublishWorker {
             List.of(PublishStatus.SCHEDULED, PublishStatus.PENDING);
 
     private static final String STUCK_MESSAGE = "발행 도중 워커가 중단되어 회수했습니다.";
+    private static final String STUCK_RETRY_MESSAGE =
+            "발행 도중 워커가 중단되어 회수했습니다. 잠시 후 다시 시도합니다.";
     private static final String EXPIRED_MESSAGE = "예약 시각의 유예 시간을 넘겨 발행하지 않았습니다.";
 
     private final PublishRecordRepository publishRecordRepository;
@@ -43,6 +46,9 @@ public class PublishWorker {
 
     @Value("${app.publish.worker.grace-minutes}")
     private long graceMinutes;
+
+    @Value("${app.publish.retry.max-count}")
+    private int maxRetryCount;
 
     /**
      * 한 콘텐츠의 도래한 발행 건을 <b>지금 이 요청 안에서</b> 실행합니다.
@@ -92,8 +98,15 @@ public class PublishWorker {
     public PublishWorkerResponse runDue() {
         LocalDateTime now = KoreaTime.now();
 
+        // 멈춘 건은 먼저 상한 안에서 재시도로 돌리고, 상한을 소진한 것만 FAILED로 정리한다(순서가 중요하다).
+        LocalDateTime stuckThreshold = now.minusMinutes(stuckThresholdMinutes);
+        int stuckRetried = publishRecordRepository.retryStuck(
+                stuckThreshold,
+                now.plus(PublishFailure.UNKNOWN.getRetryDelay()),
+                STUCK_RETRY_MESSAGE,
+                maxRetryCount);
         int stuckRecovered =
-                publishRecordRepository.failStuck(now.minusMinutes(stuckThresholdMinutes), STUCK_MESSAGE);
+                stuckRetried + publishRecordRepository.failStuck(stuckThreshold, STUCK_MESSAGE);
         int expired =
                 publishRecordRepository.failExpired(now.minusMinutes(graceMinutes), EXPIRED_MESSAGE);
 

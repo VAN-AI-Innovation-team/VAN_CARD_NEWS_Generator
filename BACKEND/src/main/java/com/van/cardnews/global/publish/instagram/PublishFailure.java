@@ -9,6 +9,11 @@ import java.time.Duration;
  * 실패는 발행 경로 여러 지점(자격 조회·자식 컨테이너·상태 폴링·발행)에서 나오지만 처리 정책은 원인으로만 갈립니다.
  *
  * {@code retryDelay}가 {@code null}이면 자동 재시도 대상이 아닙니다 — 사람이 무언가를 고쳐야 풀리는 실패입니다.
+ *
+ * <b>재시도 지연은 워커 트리거 주기(Cloud Scheduler 잡 {@code instagram-publish-due}, 5분)보다 짧아야 합니다.</b>
+ * 실패는 틱이 시작된 뒤 수십 초 지점에서 나므로, 지연이 주기와 같으면 재예약 시각이 다음 틱보다 항상 조금 뒤에
+ * 놓여 그 틱을 놓치고 한 주기를 통째로 더 기다립니다. 2026-09-15 실측에서 5분 지연이 실질 9분 35초로 늘었습니다.
+ * 주기를 바꾸면 이 값도 같이 봐야 합니다.
  */
 public enum PublishFailure {
 
@@ -38,16 +43,16 @@ public enum PublishFailure {
     /** 컨테이너는 24시간에 만료된다. 재시도는 만료된 것을 되살리지 않고 처음부터 새로 만든다. */
     CONTAINER_EXPIRED(
             "업로드 컨테이너가 만료되어 발행하지 못했습니다. 새 컨테이너로 다시 시도합니다.",
-            Duration.ofMinutes(5)),
+            Duration.ofMinutes(2)),
 
     CONTAINER_ERROR(
             "인스타그램이 업로드를 처리하지 못했습니다. 잠시 후 다시 시도합니다.",
-            Duration.ofMinutes(5)),
+            Duration.ofMinutes(2)),
 
     /** 분류되지 않은 실패. 원인을 모른다는 이유로 발행을 포기하지는 않는다. */
     UNKNOWN(
             "발행에 실패했습니다. 잠시 후 다시 시도합니다.",
-            Duration.ofMinutes(5));
+            Duration.ofMinutes(2));
 
     private final String userMessage;
     private final Duration retryDelay;
@@ -93,6 +98,9 @@ public enum PublishFailure {
         return switch (subcode) {
             case 2207003, 2207052 -> IMAGE_UNREACHABLE;
             case 2207020 -> CONTAINER_EXPIRED;
+            // 자식 컨테이너가 아직 준비되지 않은 상태에서 media_publish를 치면 나온다(HTTP 400, code 9007).
+            // 조금 뒤 같은 입력으로 다시 올리면 통과하므로 재시도 대상이다 — 2026-09-15 실측으로 확인했다.
+            case 2207027 -> CONTAINER_ERROR;
             default -> UNKNOWN;
         };
     }
