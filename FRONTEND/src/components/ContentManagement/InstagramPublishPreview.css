@@ -1,0 +1,411 @@
+.ig-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ig-preview__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ig-preview__back {
+  border: 0;
+  background: transparent;
+  color: #526178;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ig-preview__back:hover {
+  color: #173d73;
+}
+.ig-preview__eyebrow {
+  color: #8a94a6;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.ig-preview__error {
+  padding: 12px 14px;
+  border: 1px solid #efc9c9;
+  border-radius: 7px;
+  background: #fff7f7;
+  color: #b33a3a;
+  font-size: 13px;
+}
+.ig-preview__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: #526178;
+  font-size: 13px;
+}
+.ig-preview__spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #dfe4ec;
+  border-top-color: #315985;
+  border-radius: 50%;
+  animation: ig-preview-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes ig-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ig-preview__layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+/* 인스타 게시물 모사 */
+.ig-post {
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.ig-post__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef1f5;
+}
+.ig-post__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  /* 인스타의 계정 링 */
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 2px #ee2a7b;
+  flex-shrink: 0;
+}
+.ig-post__account {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ig-post__account strong {
+  font-size: 13px;
+  color: #1f2733;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ig-post__account span {
+  font-size: 11px;
+  color: #8a94a6;
+}
+.ig-post__media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f0f2f5;
+}
+.ig-post__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ig-post__media-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8a94a6;
+  font-size: 13px;
+}
+.ig-post__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2733;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ig-post__nav--prev {
+  left: 10px;
+}
+.ig-post__nav--next {
+  right: 10px;
+}
+.ig-post__counter {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ig-post__dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 0 4px;
+}
+.ig-post__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d5dae2;
+}
+.ig-post__dot--active {
+  background: #315985;
+}
+.ig-post__caption {
+  padding: 8px 14px 16px;
+}
+.ig-post__caption-preview {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2c3543;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ig-post__caption-preview strong {
+  color: #1f2733;
+}
+
+/* 실제 게시물의 액션 줄 — 하트·댓글·공유·저장 */
+.ig-post__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px 2px;
+}
+.ig-post__icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #1f2733;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.ig-post__icon--last {
+  margin-left: auto;
+}
+.ig-post__tag {
+  color: #00376b;
+}
+.ig-post__caption-empty {
+  color: #8a94a6;
+  font-style: normal;
+}
+.ig-post__time {
+  display: block;
+  margin-top: 8px;
+  color: #8a94a6;
+  font-size: 11px;
+}
+
+/* 편집 패널 */
+.ig-preview__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ig-preview__label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #526178;
+}
+.ig-preview__textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #2c3543;
+  resize: vertical;
+}
+.ig-preview__textarea:focus {
+  outline: none;
+  border-color: #315985;
+}
+.ig-preview__textarea:disabled {
+  background: #f7f8fa;
+  color: #718096;
+}
+.ig-preview__counters {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: #8a94a6;
+}
+.ig-preview__counter--over {
+  color: #b33a3a;
+  font-weight: 800;
+}
+/* 발행 시점 선택 */
+.ig-preview__schedule {
+  margin: 6px 0 0;
+  padding: 14px 16px 16px;
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+.ig-preview__schedule legend {
+  padding: 0 6px;
+  color: #526178;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ig-preview__segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #eef1f5;
+}
+.ig-preview__segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #6b7688;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+/* 라디오는 키보드·보조기술을 위해 남기고 화면에서만 지운다. */
+.ig-preview__segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.ig-preview__segment:hover {
+  color: #315985;
+}
+.ig-preview__segment--on {
+  background: #fff;
+  color: #173d73;
+  box-shadow: 0 1px 3px rgba(23, 61, 115, 0.16);
+}
+.ig-preview__segment:has(input:focus-visible) {
+  outline: 2px solid #315985;
+  outline-offset: 1px;
+}
+.ig-preview__when {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin-top: 14px;
+}
+.ig-preview__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ig-preview__field span {
+  color: #8a94a6;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ig-preview__field input {
+  padding: 10px 12px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: #2c3543;
+}
+.ig-preview__field input:focus {
+  outline: none;
+  border-color: #315985;
+}
+.ig-preview__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8a94a6;
+  font-size: 11px;
+}
+.ig-preview__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.ig-preview__status strong {
+  display: block;
+  margin-bottom: 3px;
+}
+.ig-preview__status span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ig-preview__status--progress {
+  border: 1px solid #cfe0f0;
+  background: #f4f9fd;
+  color: #315985;
+}
+.ig-preview__status--success {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #bfe3d0;
+  background: #f2fbf6;
+  color: #1f7a55;
+}
+.ig-preview__status--success a {
+  color: #1f7a55;
+  font-weight: 700;
+}
+.ig-preview__status--scheduled {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #d9cfef;
+  background: #f8f5ff;
+  color: #5b3fa8;
+}
+.ig-preview__status--failed {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #efc9c9;
+  background: #fff7f7;
+  color: #b33a3a;
+}
+.ig-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  .ig-preview__layout {
+    grid-template-columns: 1fr;
+  }
+}

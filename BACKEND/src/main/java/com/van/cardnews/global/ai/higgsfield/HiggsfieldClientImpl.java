@@ -6,7 +6,7 @@ import com.van.cardnews.global.ai.higgsfield.dto.HiggsfieldGenerationRequest;
 import com.van.cardnews.global.ai.higgsfield.dto.HiggsfieldGenerationResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -20,7 +20,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-@Profile("prod")
+@ConditionalOnProperty(name = "app.ai.mock", havingValue = "false")
 public class HiggsfieldClientImpl implements HiggsfieldClient {
 
     private static final String DEFAULT_BASE_URL =

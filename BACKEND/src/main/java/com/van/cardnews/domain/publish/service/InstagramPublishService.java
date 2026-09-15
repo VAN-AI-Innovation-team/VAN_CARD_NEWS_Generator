@@ -2,11 +2,15 @@ package com.van.cardnews.domain.publish.service;
 
 import com.van.cardnews.domain.approval.entity.ApprovalStatus;
 import com.van.cardnews.domain.approval.repository.ApprovalRequestRepository;
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.generatedimage.entity.GeneratedCardImage;
 import com.van.cardnews.domain.generatedimage.repository.GeneratedCardImageRepository;
 import com.van.cardnews.domain.instagram.service.InstagramTokenService;
+import com.van.cardnews.domain.jobhistory.entity.JobType;
+import com.van.cardnews.domain.jobhistory.service.JobHistoryService;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
@@ -54,6 +58,9 @@ public class InstagramPublishService {
     private final InstagramTokenService instagramTokenService;
     private final InstagramClient instagramClient;
     private final PublishPreflightValidator preflightValidator;
+    private final AuditLogService auditLogService;
+    private final JobHistoryService jobHistoryService;
+    private final PublishTextComposer textComposer;
 
     /** Meta 권장치. Higgsfield의 2초 간격을 복사하면 과호출이 된다. */
     @Value("${app.publish.instagram.poll-interval-ms}")
@@ -81,8 +88,8 @@ public class InstagramPublishService {
      * 돌릴 수 없고, 경로를 하나로 두어야 검증·이력·재시도가 갈라지지 않습니다.
      */
     @Transactional
-    public PublishRecord enqueue(Long contentId, String caption) {
-        return enqueueAt(contentId, caption, KoreaTime.now());
+    public PublishRecord enqueue(Long contentId, String caption, String actorId) {
+        return enqueueAt(contentId, caption, KoreaTime.now(), actorId);
     }
 
     /**
@@ -94,10 +101,11 @@ public class InstagramPublishService {
      * 캡션은 이 시점의 값으로 고정 보관합니다. 예약 후 발행 전에 콘텐츠가 수정돼도 의도한 문구가 나갑니다.
      */
     @Transactional
-    public PublishRecord schedule(Long contentId, String caption, LocalDateTime scheduledAt) {
+    public PublishRecord schedule(
+            Long contentId, String caption, LocalDateTime scheduledAt, String actorId) {
         validateScheduledAt(scheduledAt);
 
-        return enqueueAt(contentId, caption, scheduledAt);
+        return enqueueAt(contentId, caption, scheduledAt, actorId);
     }
 
     /**
@@ -119,7 +127,8 @@ public class InstagramPublishService {
         return record;
     }
 
-    private PublishRecord enqueueAt(Long contentId, String caption, LocalDateTime scheduledAt) {
+    private PublishRecord enqueueAt(
+            Long contentId, String caption, LocalDateTime scheduledAt, String actorId) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
 
@@ -133,11 +142,26 @@ public class InstagramPublishService {
             throw new CustomException(ErrorCode.CARD_IMAGES_NOT_READY);
         }
 
-        // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
-        preflightValidator.validate(cards, caption);
+        // 캡션을 지정하지 않으면 미리보기에서 저장한 문구를, 그것도 없으면 카드 구성 결과에서 만든 문구를 쓴다.
+        // 여기서 확정해 두어야 사전 검증이 실제로 나갈 문구를 보고, 예약 건도 등록 시점의 문구로 고정된다.
+        String finalCaption = caption == null || caption.isBlank()
+                ? caption(content)
+                : caption;
 
-        return publishRecordRepository.save(
-                PublishRecord.schedule(content, CHANNEL, caption, scheduledAt));
+        // Meta가 확실히 거절할 입력은 큐에 넣지 않는다. 넣으면 워커가 한도를 깎아 가며 재시도한다.
+        preflightValidator.validate(cards, finalCaption);
+
+        PublishRecord record = publishRecordRepository.save(
+                PublishRecord.schedule(content, CHANNEL, finalCaption, scheduledAt));
+
+        // 감사로그는 요청 시점에 남긴다. 실제 발행은 워커가 하므로 그때는 행위자를 알 수 없다.
+        auditLogService.record(
+                actorId,
+                AuditAction.PUBLISH,
+                contentId,
+                "인스타그램 발행 요청 — 예약 시각 " + scheduledAt);
+
+        return record;
     }
 
     /** 과거 시각과 최소 리드타임 미달은 같은 조건으로 걸린다. */
@@ -210,13 +234,47 @@ public class InstagramPublishService {
     }
 
     /**
+     * 발행에 나갈 캡션입니다. 미리보기 화면이 발행 전에 보여 주는 문구가 이것입니다.
+     *
+     * 저장된 수정본이 없으면 매번 조립합니다. 저장하지 않는 한 콘텐츠를 고치면 캡션도 따라옵니다.
+     */
+    @Transactional(readOnly = true)
+    public String caption(Long contentId) {
+        return caption(contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND)));
+    }
+
+    private String caption(Content content) {
+        String saved = content.getPublishCaption();
+
+        return saved == null || saved.isBlank() ? textComposer.caption(content) : saved;
+    }
+
+    /**
+     * 미리보기에서 고친 캡션을 저장합니다.
+     *
+     * 발행 시점이 아니라 여기서 검증하는 이유는, 상한을 넘긴 문구를 저장해 두면 사용자가
+     * 발행 버튼을 누르는 순간에야 그 사실을 알게 되기 때문입니다.
+     */
+    @Transactional
+    public String updateCaption(Long contentId, String caption) {
+        preflightValidator.validateCaption(caption);
+
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CONTENT_NOT_FOUND));
+
+        content.updatePublishCaption(caption);
+
+        return caption;
+    }
+
+    /**
      * 최신 발행 건입니다. 예약(SCHEDULED)이든 완료(SUCCESS)든 화면은 이 한 건만 보면 됩니다.
      */
     @Transactional(readOnly = true)
     public PublishRecord latest(Long contentId) {
-        return publishRecordRepository.findByContentIdOrderByIdDesc(contentId).stream()
-                .filter(record -> CHANNEL.equals(record.getChannel()))
-                .findFirst()
+        return publishRecordRepository
+                .findTopByContentIdAndChannelOrderByIdDesc(contentId, CHANNEL)
                 .orElseThrow(() -> new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
     }
 
@@ -275,17 +333,33 @@ public class InstagramPublishService {
 
         List<String> childIds = new ArrayList<>();
         for (GeneratedCardImage card : cards) {
-            // 대체 텍스트 생성은 VAN-8. 그때까지는 alt_text 없이 보낸다.
-            childIds.add(instagramClient.createCarouselItem(credentials, card.getImageUrl(), null));
+            childIds.add(instagramClient.createCarouselItem(
+                    credentials, card.getImageUrl(), textComposer.altText(record.getContent(), card)));
+        }
+
+        // 자식이 준비되기 전에 발행하면 Meta가 400(code 9007/2207027)으로 거절한다. 부모가 FINISHED라는 것이
+        // 자식까지 끝났다는 뜻은 아니어서, 부모만 기다리면 부모가 빨리 끝날수록 오히려 실패한다.
+        // 폴링 예산은 전체가 나눠 쓴다 — 컨테이너마다 상한을 따로 주면 최악 소요가 컨테이너 수만큼 늘어
+        // 요청 타임아웃(600초)과 스케줄러 attemptDeadline을 넘긴다.
+        int pollBudget = maxPollCount;
+        for (String childId : childIds) {
+            pollBudget = awaitFinished(credentials, childId, pollBudget);
         }
 
         // 컨테이너는 생성 후 24시간에 만료되므로 재시도 때도 매번 새로 만든다(재사용 금지).
         String containerId = instagramClient.createCarouselContainer(credentials, childIds, caption);
 
-        awaitFinished(credentials, containerId);
+        awaitFinished(credentials, containerId, pollBudget);
 
         String igMediaId = instagramClient.publishContainer(credentials, containerId);
-        record.markSuccess(igMediaId, instagramClient.getPermalink(credentials, igMediaId));
+        String permalink = instagramClient.getPermalink(credentials, igMediaId);
+        record.markSuccess(igMediaId, permalink);
+
+        // 성공 건만 작업이력에 남긴다. 실패까지 남기면 ContentService가 최신 작업 이력의 상태를
+        // 콘텐츠 생성 상태로 내려보내므로(resolveGenerationStatus) 화면에 "생성 실패"로 뜨고,
+        // PENDING/PROCESSING 이력은 콘텐츠 수정까지 막는다. 실패 원인은 publish_records에 남는다.
+        jobHistoryService.createJobHistory(record.getContent(), JobType.INSTAGRAM_PUBLISH)
+                .markCompleted(permalink);
 
         // 다운로드는 더 이상 PUBLISHED로 전이시키지 않는다. 실제 외부 발행만 이 상태를 만든다.
         record.getContent().publish();
@@ -294,36 +368,44 @@ public class InstagramPublishService {
     }
 
     /**
-     * 컨테이너가 처리될 때까지 기다립니다.
+     * 컨테이너가 처리될 때까지 기다리고, 쓰고 남은 폴링 예산을 돌려줍니다.
+     *
+     * 예산은 한 건의 발행이 여러 컨테이너(자식 n개 + 부모)를 기다리는 동안 공유합니다.
+     * 이미 FINISHED면 대기 없이 돌아오므로, 평소에는 상태 조회 몇 번만 늘어납니다.
      */
-    private void awaitFinished(InstagramCredentials credentials, String containerId) {
-        for (int attempt = 1; attempt <= maxPollCount; attempt++) {
+    private int awaitFinished(InstagramCredentials credentials, String containerId, int pollBudget) {
+        int remaining = pollBudget;
+
+        while (true) {
             InstagramClient.ContainerStatus status =
                     instagramClient.getContainerStatus(credentials, containerId);
 
             switch (status) {
                 case FINISHED, PUBLISHED -> {
-                    return;
+                    return remaining;
                 }
                 case ERROR -> throw new InstagramPublishException(
                         PublishFailure.CONTAINER_ERROR, "컨테이너 처리가 실패했습니다 (ERROR).");
                 case EXPIRED -> throw new InstagramPublishException(
                         PublishFailure.CONTAINER_EXPIRED,
                         "컨테이너가 만료됐습니다 (EXPIRED). 생성 후 24시간이 지나면 재사용할 수 없습니다.");
-                case IN_PROGRESS -> sleepBeforeNextPoll(attempt);
+                case IN_PROGRESS -> {
+                    remaining--;
+
+                    if (remaining <= 0) {
+                        throw new InstagramPublishException(
+                                PublishFailure.UNKNOWN,
+                                "컨테이너 처리가 " + maxPollCount + "회 폴링("
+                                        + pollIntervalMs + "ms 간격) 안에 끝나지 않았습니다.");
+                    }
+
+                    sleepBeforeNextPoll();
+                }
             }
         }
-
-        throw new InstagramPublishException(
-                PublishFailure.UNKNOWN,
-                "컨테이너 처리가 " + maxPollCount + "회 폴링(" + pollIntervalMs + "ms 간격) 안에 끝나지 않았습니다.");
     }
 
-    private void sleepBeforeNextPoll(int attempt) {
-        if (attempt >= maxPollCount) {
-            return;
-        }
-
+    private void sleepBeforeNextPoll() {
         try {
             Thread.sleep(pollIntervalMs);
         } catch (InterruptedException e) {

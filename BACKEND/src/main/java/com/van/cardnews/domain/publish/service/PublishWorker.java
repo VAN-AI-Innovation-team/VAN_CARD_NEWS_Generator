@@ -4,6 +4,7 @@ import com.van.cardnews.domain.publish.dto.response.PublishWorkerResponse;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.entity.PublishStatus;
 import com.van.cardnews.domain.publish.repository.PublishRecordRepository;
+import com.van.cardnews.global.publish.instagram.PublishFailure;
 import com.van.cardnews.global.time.KoreaTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,8 @@ public class PublishWorker {
             List.of(PublishStatus.SCHEDULED, PublishStatus.PENDING);
 
     private static final String STUCK_MESSAGE = "발행 도중 워커가 중단되어 회수했습니다.";
+    private static final String STUCK_RETRY_MESSAGE =
+            "발행 도중 워커가 중단되어 회수했습니다. 잠시 후 다시 시도합니다.";
     private static final String EXPIRED_MESSAGE = "예약 시각의 유예 시간을 넘겨 발행하지 않았습니다.";
 
     private final PublishRecordRepository publishRecordRepository;
@@ -44,6 +47,46 @@ public class PublishWorker {
     @Value("${app.publish.worker.grace-minutes}")
     private long graceMinutes;
 
+    @Value("${app.publish.retry.max-count}")
+    private int maxRetryCount;
+
+    /**
+     * 한 콘텐츠의 도래한 발행 건을 <b>지금 이 요청 안에서</b> 실행합니다.
+     * 화면이 발행 버튼을 누른 직후 호출합니다.
+     *
+     * 배치({@link #runDue()})가 아니라 이 경로가 따로 있는 이유는 Cloud Run의 CPU 할당 때문입니다.
+     * 이 서비스는 CPU 스로틀링이 켜진 기본 설정이라 <b>요청을 처리하는 동안에만</b> CPU가 나옵니다.
+     * 컨테이너 폴링에 수 분이 걸리는 발행을 요청 밖(스케줄러 스레드)에서 돌리면 그 스레드는 기어갑니다.
+     * 그래서 사용자가 기다리는 발행은 사용자의 요청 스레드가 직접 끝냅니다.
+     *
+     * 이미 끝났거나 다른 워커가 선점한 건은 건드리지 않고 현재 상태를 그대로 돌려줍니다 —
+     * 화면은 이 응답이 아니라 상태 조회로 결과를 보므로, 여기서 예외를 던질 이유가 없습니다.
+     *
+     * ponytail: 요청 타임아웃(300초)이 컨테이너 폴링 상한(60초 × 5회)과 거의 같다. 최악의 경우
+     * 요청이 먼저 끊기지만 그때도 건은 PROCESSING으로 남아 stuck 회수 경로가 집어간다.
+     * 여유가 필요해지면 INSTAGRAM_POLL_INTERVAL_MS·MAX_POLL_COUNT로 줄인다.
+     */
+    public PublishRecord runNow(Long contentId) {
+        PublishRecord record = instagramPublishService.latest(contentId);
+
+        if (!DUE_STATUSES.contains(record.getStatus())) {
+            return record;
+        }
+
+        // 아직 도래하지 않은 예약은 앞당기지 않는다. 즉시 발행도 SCHEDULED를 쓰기 때문에
+        // 상태만으로는 "지금 눌린 건"과 "내일 나갈 예약"이 구분되지 않는다 — 시각이 그 구분이다.
+        if (record.getScheduledAt().isAfter(KoreaTime.now())) {
+            return record;
+        }
+
+        // 선점은 배치와 같은 조건부 UPDATE 한 곳을 지난다. 그래서 둘이 겹쳐도 발행은 1회다.
+        if (publishRecordRepository.claim(record.getId(), KoreaTime.now()) != 1) {
+            return record;
+        }
+
+        return instagramPublishService.execute(record.getId());
+    }
+
     /**
      * 회수 → 유예 정리 → 도래 건 발행 순서로 1회 실행합니다.
      *
@@ -55,8 +98,15 @@ public class PublishWorker {
     public PublishWorkerResponse runDue() {
         LocalDateTime now = KoreaTime.now();
 
+        // 멈춘 건은 먼저 상한 안에서 재시도로 돌리고, 상한을 소진한 것만 FAILED로 정리한다(순서가 중요하다).
+        LocalDateTime stuckThreshold = now.minusMinutes(stuckThresholdMinutes);
+        int stuckRetried = publishRecordRepository.retryStuck(
+                stuckThreshold,
+                now.plus(PublishFailure.UNKNOWN.getRetryDelay()),
+                STUCK_RETRY_MESSAGE,
+                maxRetryCount);
         int stuckRecovered =
-                publishRecordRepository.failStuck(now.minusMinutes(stuckThresholdMinutes), STUCK_MESSAGE);
+                stuckRetried + publishRecordRepository.failStuck(stuckThreshold, STUCK_MESSAGE);
         int expired =
                 publishRecordRepository.failExpired(now.minusMinutes(graceMinutes), EXPIRED_MESSAGE);
 

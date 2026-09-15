@@ -86,7 +86,8 @@ public class PublishPreflightValidator {
         }
     }
 
-    private void validateCaption(String caption) {
+    /** 캡션만 따로 봅니다. 미리보기의 저장이 발행까지 가지 않고 여기서 걸러지도록. */
+    public void validateCaption(String caption) {
         if (caption == null || caption.isBlank()) {
             return;
         }

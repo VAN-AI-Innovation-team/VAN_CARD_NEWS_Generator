@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   downloadApprovedCards,
   fetchApprovalRequest,
-  publishApprovedContentToInstagram,
   type ApprovalRequestResponse,
 } from '../../api/approvalApi';
 import {
@@ -13,6 +12,7 @@ import {
   type ContentPreviewResponse,
   type GeneratedCardImageResponse,
 } from '../../api/contentApi';
+import InstagramPublishPreview from './InstagramPublishPreview';
 import './ContentManagementDetail.css';
 
 type ApprovalState = ApprovalRequestResponse & {
@@ -74,9 +74,7 @@ export default function ContentManagementDetail({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishStatus, setPublishStatus] = useState<'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | null>(null);
-  const [publishPermalink, setPublishPermalink] = useState<string | null>(null);
+  const [isPreviewingPublish, setIsPreviewingPublish] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generationInProgress =
@@ -223,43 +221,21 @@ export default function ContentManagementDetail({
     }
   }
 
-  async function publish() {
-    if (isPublishing || approval?.status !== 'APPROVED') return;
-
-    try {
-      setIsPublishing(true);
-      setPublishStatus('PENDING');
-      setPublishPermalink(null);
-      setError(null);
-
-      const result = await publishApprovedContentToInstagram(content.contentId);
-
-      if (result.status === 'FAILED') {
-        throw new Error(result.errorMessage ?? 'Instagram 게시에 실패했습니다.');
-      }
-
-      setPublishStatus(
-        result.status === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING',
-      );
-
-      if (result.status === 'SUCCESS') {
-        setPublishPermalink(result.permalink);
-        onUpdated();
-        return;
-      }
-
-      onUpdated();
-      await load(true);
-    } catch (e) {
-      setPublishStatus('FAILED');
-      setError(e instanceof Error ? e.message : 'Instagram 게시에 실패했습니다.');
-    } finally {
-      setIsPublishing(false);
-    }
-  }
-
   const currentImage = images[selectedIndex];
   const status = approval?.status ?? null;
+
+  // 발행 미리보기는 상세를 대체하는 단계 화면이다. 카드 목록·승인 정보는 이 단계에서 볼 일이 없다.
+  if (isPreviewingPublish) {
+    return (
+      <InstagramPublishPreview
+        contentId={content.contentId}
+        title={preview?.title ?? content.title}
+        images={images}
+        onBack={() => setIsPreviewingPublish(false)}
+        onPublished={onUpdated}
+      />
+    );
+  }
 
   return (
     <section className="content-management-detail">
@@ -429,40 +405,19 @@ export default function ContentManagementDetail({
                   type="button"
                   className="secondary-button"
                   onClick={() => void download()}
-                  disabled={isDownloading || isPublishing}
+                  disabled={isDownloading}
                 >
                   {isDownloading ? '다운로드 중...' : '최종 결과물 다운로드'}
                 </button>
 
-                {publishStatus === 'SUCCESS' ? (
-                  publishPermalink ? (
-                    <a
-                      className="primary-button"
-                      href={publishPermalink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Instagram 게시 완료 · 보기
-                    </a>
-                  ) : (
-                    <button type="button" className="primary-button" disabled>
-                      Instagram 게시 완료
-                    </button>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={() => void publish()}
-                    disabled={isPublishing}
-                  >
-                    {isPublishing || publishStatus === 'PROCESSING'
-                      ? 'Instagram 게시 중...'
-                      : publishStatus === 'FAILED'
-                        ? '다시 게시'
-                        : 'Instagram 게시'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setIsPreviewingPublish(true)}
+                  disabled={isDownloading || !images.length}
+                >
+                  Instagram 미리보기
+                </button>
               </>
             ) : status === 'REJECTED' ? (
               /* 4. 반려 */

@@ -27,15 +27,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  * DB를 물리면 DATABASE_URL이 있는 환경에서만 도는 테스트가 되어 로컬에서 무력해진다.
  * 실제 {@code application.properties}는 로드하므로 @Value 키 누락은 그대로 잡힌다.
  *
+ * AI 두 쌍은 프로필이 아니라 {@code app.ai.mock}으로 갈린다(VAN-21). 기본값이 프로필별로
+ * 잡혀 있어 프로필만 뒤집으면 결과는 종전과 같고, 그 사실을 아래 prod/dev 테스트가 그대로
+ * 통과하는 것으로 고정한다. 값을 직접 준 조합은 별도 테스트가 본다.
+ *
  * <b>새 prod 빈을 추가하면 이 목록에도 추가할 것</b> (예: VAN-9의 InstagramClientImpl).
  * 명시 등록이라 자동으로 따라오지 않는다.
  */
 class ProdProfileClientBeanTest {
 
-    private ApplicationContextRunner runner(String profile) {
+    private ApplicationContextRunner runner(String profile, String... properties) {
         return new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
                 .withPropertyValues("spring.profiles.active=" + profile)
+                .withPropertyValues(properties)
                 .withBean(ObjectMapper.class)
                 .withUserConfiguration(
                         OpenAIClientImpl.class,
@@ -45,7 +50,8 @@ class ProdProfileClientBeanTest {
                         MockOpenAIClient.class,
                         MockHiggsfieldClient.class,
                         MockInstagramTokenClient.class,
-                        MockInstagramClient.class
+                        MockInstagramClient.class,
+                        AiMockInProdWarning.class
                 );
     }
 
@@ -84,5 +90,38 @@ class ProdProfileClientBeanTest {
             assertThat(context).doesNotHaveBean(InstagramTokenClientImpl.class);
             assertThat(context).doesNotHaveBean(InstagramClientImpl.class);
         });
+    }
+
+    /**
+     * 이번에 필요한 조합 — 목업 카드뉴스를 실계정에 올려 발행 경로만 검증한다.
+     * AI는 실 키가 없어 실구현이면 생성 단계에서 실패하고, 키를 넣으면 검증과 무관한 비용이 든다.
+     */
+    @Test
+    void prod_프로필에_app_ai_mock_true면_AI만_Mock이고_인스타는_실구현이다() {
+        runner("prod", "app.ai.mock=true").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).hasSingleBean(MockOpenAIClient.class);
+            assertThat(context).hasSingleBean(MockHiggsfieldClient.class);
+            assertThat(context).doesNotHaveBean(OpenAIClientImpl.class);
+            assertThat(context).doesNotHaveBean(HiggsfieldClientImpl.class);
+
+            assertThat(context).hasSingleBean(InstagramTokenClientImpl.class);
+            assertThat(context).hasSingleBean(InstagramClientImpl.class);
+            assertThat(context).doesNotHaveBean(MockInstagramTokenClient.class);
+            assertThat(context).doesNotHaveBean(MockInstagramClient.class);
+        });
+    }
+
+    /** 이 조합은 사고일 수도 있으므로 기동 로그에 WARN을 남기는 빈이 함께 떠야 한다. */
+    @Test
+    void prod_프로필에_app_ai_mock_true면_경고_빈이_뜬다() {
+        runner("prod", "app.ai.mock=true").run(context ->
+                assertThat(context).hasSingleBean(AiMockInProdWarning.class));
+
+        runner("prod").run(context ->
+                assertThat(context).doesNotHaveBean(AiMockInProdWarning.class));
+
+        runner("dev").run(context ->
+                assertThat(context).doesNotHaveBean(AiMockInProdWarning.class));
     }
 }

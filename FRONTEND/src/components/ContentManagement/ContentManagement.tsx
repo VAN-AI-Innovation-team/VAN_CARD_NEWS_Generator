@@ -17,6 +17,36 @@ function formatDate(value: string) {
   });
 }
 
+/** 발행 컬럼 한 칸. 예약 건만 시각을 함께 보여 준다. */
+function publishCell(content: ContentManagementListItem) {
+  switch (content.publishStatus) {
+    case 'SUCCESS':
+      return { modifier: 'success', label: '발행 완료', at: null };
+    case 'SCHEDULED':
+      return {
+        modifier: 'scheduled',
+        label: '예약',
+        at: content.publishScheduledAt,
+      };
+    case 'PENDING':
+    case 'PROCESSING':
+      return { modifier: 'progress', label: '발행 중', at: null };
+    case 'FAILED':
+      return { modifier: 'failed', label: '발행 실패', at: null };
+    default:
+      return { modifier: 'none', label: '미발행', at: null };
+  }
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function approvalLabel(
   status: ContentManagementListItem['approvalStatus'],
   generationStatus: ContentManagementListItem['generationStatus'],
@@ -116,6 +146,7 @@ export default function ContentManagement({
             <span>생성일</span>
             <span>카드 수</span>
             <span>승인 상태</span>
+            <span>발행 상태</span>
             <span />
           </div>
           {contents.map((content) => (
@@ -150,6 +181,22 @@ export default function ContentManagement({
                   )}
                 </em>
               </span>
+              <span>
+                <em
+                  className={`content-management__status content-management__status--${
+                    publishCell(content).modifier
+                  }`}
+                >
+                  {publishCell(content).label}
+                </em>
+
+                {publishCell(content).at && (
+                  <small className="content-management__publish-at">
+                    {formatDateTime(publishCell(content).at as string)}
+                  </small>
+                )}
+              </span>
+
               <span className="content-management__arrow">→</span>
             </button>
           ))}

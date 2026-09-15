@@ -13,7 +13,7 @@ import com.van.cardnews.domain.generation.dto.request.CardGenerationRequest;
 import com.van.cardnews.domain.generation.dto.response.CardGenerationResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-@Profile("prod")
+@ConditionalOnProperty(name = "app.ai.mock", havingValue = "false")
 public class OpenAIClientImpl implements com.van.cardnews.global.ai.openai.OpenAIClient {
 
     private final OpenAIClient client;
@@ -38,6 +38,14 @@ public class OpenAIClientImpl implements com.van.cardnews.global.ai.openai.OpenA
         this.model = model;
         this.maxTokens = maxTokens;
         this.objectMapper = objectMapper;
+    }
+
+    /**
+     * 실구현이 돌려주는 문구는 모두 실제로 생성된 것이므로 걸러낼 자리 채움이 없습니다.
+     */
+    @Override
+    public boolean isPlaceholder(String fieldPath, String value) {
+        return false;
     }
 
     @Override

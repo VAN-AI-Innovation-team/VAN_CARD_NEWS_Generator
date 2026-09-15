@@ -1,5 +1,7 @@
 package com.van.cardnews.domain.publish.service;
 
+import com.van.cardnews.domain.audit.entity.AuditAction;
+import com.van.cardnews.domain.audit.service.AuditLogService;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.content.repository.ContentRepository;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
@@ -34,14 +36,25 @@ import static org.assertj.core.api.Assertions.assertThat;
  * dev 프로필 + MockInstagramClient 기준이며, 폴링 간격만 1ms로 낮춰 테스트가 분 단위로 늘어지지 않게 한다.
  */
 @SpringBootTest
-@TestPropertySource(properties = "app.publish.instagram.poll-interval-ms=1")
+@TestPropertySource(properties = {
+        "app.publish.instagram.poll-interval-ms=1",
+        // 인프로세스 트리거를 켜 두면 스케줄러가 이 테스트와 같은 큐를 훑어 선점 횟수 단언이 깨진다.
+        "app.publish.worker.in-process.enabled=false",
+        // 기본값(3)과 일부러 다르게 잡는다 — 오버라이드가 안 먹으면 상한 소진 테스트가 실패하도록.
+        "app.publish.retry.max-count=2"
+})
 class PublishWorkerIntegrationTest {
+
+    private static final int MAX_RETRY_COUNT = 2;
 
     @Autowired
     private PublishWorker publishWorker;
 
     @Autowired
     private PublishRecordRepository publishRecordRepository;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     @Autowired
     private MockInstagramClient instagramClient;
@@ -84,6 +97,9 @@ class PublishWorkerIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        // contents FK가 ON DELETE RESTRICT라 발행이 남긴 이력을 먼저 지워야 콘텐츠가 지워진다.
+        jdbcTemplate.update("DELETE FROM job_histories WHERE content_id = ?", contentId);
+        jdbcTemplate.update("DELETE FROM audit_logs WHERE target_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM publish_records WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM generated_card_images WHERE content_id = ?", contentId);
         jdbcTemplate.update("DELETE FROM contents WHERE id = ?", contentId);
@@ -131,6 +147,36 @@ class PublishWorkerIntegrationTest {
     }
 
     @Test
+    void runNow는_배치를_기다리지_않고_그_콘텐츠의_도래한_건을_발행한다() {
+        Long recordId = insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SUCCESS.name());
+    }
+
+    @Test
+    void runNow를_두_번_불러도_발행_호출은_1회다() {
+        insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runNow(contentId);
+        publishWorker.runNow(contentId);
+
+        assertThat(callCount("publishContainer")).isEqualTo(1);
+    }
+
+    @Test
+    void runNow는_아직_도래하지_않은_예약을_앞당기지_않는다() {
+        Long recordId = insertScheduled(KoreaTime.now().plusMinutes(30));
+
+        publishWorker.runNow(contentId);
+
+        // 즉시 발행도 SCHEDULED를 쓰므로 상태만으로는 예약과 구분되지 않는다. 시각이 그 구분이다.
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SCHEDULED.name());
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    @Test
     void 아직_도래하지_않은_예약은_건드리지_않는다() {
         Long recordId = insertScheduled(KoreaTime.now().plusMinutes(30));
 
@@ -140,14 +186,32 @@ class PublishWorkerIntegrationTest {
         assertThat(instagramClient.calls()).isEmpty();
     }
 
+    /**
+     * 워커가 발행 도중 죽는 원인은 대개 앱이 아니라 인프라다(인스턴스 메모리 초과 등).
+     * 곧바로 FAILED로 못박으면 Meta가 거절한 건은 자동 재시도되는데 우리 쪽 사고로 죽은 건만
+     * 사람이 다시 요청해야 하는 뒤집힌 정책이 된다. 상한이 남아 있으면 다시 큐에 올린다.
+     */
     @Test
-    void PROCESSING에서_멈춘_건은_임계_시간을_넘기면_회수된다() {
-        // 워커가 발행 도중 죽은 상태 — 아무도 손대지 않으면 영구 정체된다
+    void PROCESSING에서_멈춘_건은_임계_시간을_넘기면_재시도로_회수된다() {
         Long recordId = insertProcessing(KoreaTime.now().minusMinutes(30));
 
         publishWorker.runDue();
 
+        assertThat(statusOf(recordId)).isEqualTo(PublishStatus.SCHEDULED.name());
+        assertThat(retryCountOf(recordId)).isEqualTo(1);
+        // 재예약 시각이 아직 도래하지 않았으므로 같은 회차에 발행되지는 않는다
+        assertThat(instagramClient.calls()).isEmpty();
+    }
+
+    /** 무한 재선점은 재시도 상한이 막는다 — 상한을 소진한 건은 FAILED로 정리된다. */
+    @Test
+    void 재시도_상한을_소진한_채_멈춘_건은_실패로_정리된다() {
+        Long recordId = insertProcessing(KoreaTime.now().minusMinutes(30), MAX_RETRY_COUNT);
+
+        publishWorker.runDue();
+
         assertThat(statusOf(recordId)).isEqualTo(PublishStatus.FAILED.name());
+        assertThat(retryCountOf(recordId)).isEqualTo(MAX_RETRY_COUNT);
     }
 
     @Test
@@ -176,12 +240,22 @@ class PublishWorkerIntegrationTest {
 
     /** 워커가 선점만 해 놓고 죽은 상태를 만든다. */
     private Long insertProcessing(LocalDateTime processingStartedAt) {
+        return insertProcessing(processingStartedAt, 0);
+    }
+
+    private Long insertProcessing(LocalDateTime processingStartedAt, int retryCount) {
         PublishRecord record = PublishRecord.schedule(
                 content(), InstagramPublishService.CHANNEL, "캡션", processingStartedAt);
         record.markProcessing();
         ReflectionTestUtils.setField(record, "processingStartedAt", processingStartedAt);
+        ReflectionTestUtils.setField(record, "retryCount", retryCount);
 
         return publishRecordRepository.save(record).getId();
+    }
+
+    private int retryCountOf(Long recordId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT retry_count FROM publish_records WHERE id = ?", Integer.class, recordId);
     }
 
     private Content content() {
@@ -219,5 +293,41 @@ class PublishWorkerIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 작업이력·감사로그 (V10 CHECK 제약 확인)
+    // ------------------------------------------------------------------
+
+    /** 새 job_type이 CHECK 제약을 통과하는지는 실제 DB에서만 판정된다. */
+    @Test
+    void 발행에_성공하면_작업이력에_permalink가_남는다() {
+        Long recordId = insertScheduled(KoreaTime.now().minusSeconds(1));
+
+        publishWorker.runDue();
+
+        String permalink = jdbcTemplate.queryForObject(
+                "SELECT permalink FROM publish_records WHERE id = ?", String.class, recordId);
+        String resultUrl = jdbcTemplate.queryForObject("""
+                SELECT result_url FROM job_histories
+                WHERE content_id = ? AND job_type = 'INSTAGRAM_PUBLISH' AND status = 'COMPLETED'
+                """, String.class, contentId);
+
+        assertThat(resultUrl).isNotNull().isEqualTo(permalink);
+    }
+
+    /**
+     * 같은 이유로 audit_logs.action의 새 값도 실제 DB에서 확인한다.
+     *
+     * 발행 요청 경로(enqueue) 대신 기록 지점을 직접 부르는 이유는, 사전 검증이 카드 이미지 URL로
+     * 실제 HTTP HEAD를 보내기 때문이다. 이 픽스처의 example.com URL은 CI에서 도달하지 못한다.
+     */
+    @Test
+    void 발행_감사로그는_PUBLISH로_남는다() {
+        auditLogService.record("tester", AuditAction.PUBLISH, contentId, "인스타그램 발행 요청");
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT actor_id FROM audit_logs WHERE target_id = ? AND action = 'PUBLISH'",
+                String.class, contentId)).isEqualTo("tester");
     }
 }

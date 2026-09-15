@@ -3,6 +3,7 @@ package com.van.cardnews.domain.publish.controller;
 import com.van.cardnews.domain.content.entity.Content;
 import com.van.cardnews.domain.publish.entity.PublishRecord;
 import com.van.cardnews.domain.publish.service.InstagramPublishService;
+import com.van.cardnews.domain.publish.service.PublishWorker;
 import com.van.cardnews.global.config.WebConfig;
 import com.van.cardnews.global.exception.CustomException;
 import com.van.cardnews.global.exception.ErrorCode;
@@ -20,10 +21,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +47,10 @@ class InstagramPublishControllerTest {
     @MockBean
     private InstagramPublishService instagramPublishService;
 
+    // 컨트롤러가 실행 트리거로 워커를 직접 부른다. 이 테스트가 보는 것은 응답 계약이라 실행은 목킹한다.
+    @MockBean
+    private PublishWorker publishWorker;
+
     private PublishRecord record(String igMediaId, String permalink) {
         Content content = mock(Content.class);
         when(content.getId()).thenReturn(42L);
@@ -60,7 +67,7 @@ class InstagramPublishControllerTest {
     void 발행_요청은_큐에_등록하고_202를_반환한다() throws Exception {
         // record()가 내부에서 다른 목을 스터빙하므로 when(...) 인자 안에서 만들면 스터빙이 겹친다
         PublishRecord scheduled = record(null, null);
-        when(instagramPublishService.enqueue(anyLong(), any())).thenReturn(scheduled);
+        when(instagramPublishService.enqueue(anyLong(), any(), any())).thenReturn(scheduled);
 
         mockMvc.perform(post(PATH))
                 .andExpect(status().isAccepted())
@@ -69,8 +76,29 @@ class InstagramPublishControllerTest {
     }
 
     @Test
+    void 발행_요청은_X_Actor_Id를_행위자로_넘긴다() throws Exception {
+        PublishRecord scheduled = record(null, null);
+        when(instagramPublishService.enqueue(anyLong(), any(), any())).thenReturn(scheduled);
+
+        mockMvc.perform(post(PATH).header("X-Actor-Id", "hanms"))
+                .andExpect(status().isAccepted());
+
+        verify(instagramPublishService).enqueue(42L, null, "hanms");
+    }
+
+    @Test
+    void X_Actor_Id가_없으면_SYSTEM으로_넘긴다() throws Exception {
+        PublishRecord scheduled = record(null, null);
+        when(instagramPublishService.enqueue(anyLong(), any(), any())).thenReturn(scheduled);
+
+        mockMvc.perform(post(PATH)).andExpect(status().isAccepted());
+
+        verify(instagramPublishService).enqueue(42L, null, "SYSTEM");
+    }
+
+    @Test
     void 미승인_콘텐츠는_403과_발행_전용_메시지로_거절된다() throws Exception {
-        when(instagramPublishService.enqueue(anyLong(), any()))
+        when(instagramPublishService.enqueue(anyLong(), any(), any()))
                 .thenThrow(new CustomException(ErrorCode.CONTENT_NOT_APPROVED_FOR_PUBLISH));
 
         mockMvc.perform(post(PATH))
@@ -81,7 +109,7 @@ class InstagramPublishControllerTest {
 
     @Test
     void 이미_발행된_콘텐츠는_409로_거절된다() throws Exception {
-        when(instagramPublishService.enqueue(anyLong(), any()))
+        when(instagramPublishService.enqueue(anyLong(), any(), any()))
                 .thenThrow(new CustomException(ErrorCode.CONTENT_ALREADY_PUBLISHED));
 
         mockMvc.perform(post(PATH)).andExpect(status().isConflict());
@@ -90,7 +118,7 @@ class InstagramPublishControllerTest {
     @Test
     void 예약_등록은_202와_예약_시각을_돌려준다() throws Exception {
         PublishRecord scheduled = record(null, null);
-        when(instagramPublishService.schedule(anyLong(), any(), any())).thenReturn(scheduled);
+        when(instagramPublishService.schedule(anyLong(), any(), any(), any())).thenReturn(scheduled);
 
         mockMvc.perform(post(PATH + "/schedule")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,7 +130,7 @@ class InstagramPublishControllerTest {
 
     @Test
     void 잘못된_예약_시각은_400으로_거절된다() throws Exception {
-        when(instagramPublishService.schedule(anyLong(), any(), any()))
+        when(instagramPublishService.schedule(anyLong(), any(), any(), any()))
                 .thenThrow(new CustomException(ErrorCode.INVALID_SCHEDULE_TIME));
 
         mockMvc.perform(post(PATH + "/schedule")
@@ -151,5 +179,35 @@ class InstagramPublishControllerTest {
                 .thenThrow(new CustomException(ErrorCode.PUBLISH_RECORD_NOT_FOUND));
 
         mockMvc.perform(get(PATH)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 캡션_조회는_발행_기록이_없어도_문구를_돌려준다() throws Exception {
+        when(instagramPublishService.caption(42L)).thenReturn("조립된 캡션");
+
+        mockMvc.perform(get(PATH + "/caption"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caption").value("조립된 캡션"));
+    }
+
+    @Test
+    void 캡션_저장은_저장된_문구를_돌려준다() throws Exception {
+        when(instagramPublishService.updateCaption(anyLong(), any())).thenReturn("고친 캡션");
+
+        mockMvc.perform(put(PATH + "/caption")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"고친 캡션\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caption").value("고친 캡션"));
+
+        verify(instagramPublishService).updateCaption(42L, "고친 캡션");
+    }
+
+    @Test
+    void 빈_캡션_저장은_400이다() throws Exception {
+        mockMvc.perform(put(PATH + "/caption")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"caption\":\"  \"}"))
+                .andExpect(status().isBadRequest());
     }
 }
